@@ -9,7 +9,6 @@ from pathlib import Path
 
 import joblib
 import numpy as np
-from scipy.sparse import load_npz
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
