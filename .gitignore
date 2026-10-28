@@ -1,0 +1,66 @@
+# Private data and local agent state
+memory_dataset/
+public_sources/
+data/
+datasets/
+raw_data/
+*.jsonl
+*.jsonl.gz
+*.parquet
+*.arrow
+*.csv
+*.sqlite
+*.sqlite3
+*.db
+
+# Model artifacts and training outputs
+checkpoints/
+models/
+weights/
+artifacts/
+outputs/
+runs/
+wandb/
+mlruns/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+*.onnx
+*.joblib
+*.pkl
+
+# Local agent/application state
+.hermes/
+.claude/
+.codex/
+.opencode/
+.env
+.env.*
+!.env.example
+*.log
+logs/
+cache/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+scratch/
