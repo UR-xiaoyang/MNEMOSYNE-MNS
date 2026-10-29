@@ -46,13 +46,96 @@ EGRESS      本地/云端投递策略
 
 ## 当前状态
 
-当前处于数据准备和基线实现阶段：
+**RANK 专家的 CPU baseline 已完成。**
 
-1. 已完成多来源历史数据的本地清洗与弱监督构建；
-2. 已导入公开记忆任务数据并建立训练课程；
-3. 已完成 `RANK-TFIDF` 特征工程；
-4. 下一步训练 CPU 重排序基线，再进入 shadow mode；
-5. 后续按专家模块分别训练和发布。
+已训练并评估的基线模型：
+
+| Model | Type | NDCG@10 | Status |
+|---|---|---:|---|
+| TF-IDF cosine | Lexical | 0.3916 | Baseline |
+| Pairwise logistic | Linear structured | 0.4090 | Baseline |
+| Pairwise tree | Nonlinear structured | 0.4278 | Baseline |
+| **Frozen E5** | **Semantic** | **0.5146** | **✓ Recommended** |
+| Hybrid E5+features | Semantic + structured | TBD | Training |
+
+推荐基线：**MNEMOSYNE-MNS-RANK-E5-FROZEN-01**
+
+- Encoder: `intfloat/multilingual-e5-small` (frozen weights)
+- Training: AlpsBench public train split only
+- Validation: 312 queries, NDCG@10 = 0.5146
+- Inference: CPU, no GPU required
+- Multilingual: Chinese + English
+
+详细报告：[docs/baseline-selection-report.md](docs/baseline-selection-report.md)
+
+## 快速开始
+
+### 环境要求
+
+```bash
+python >= 3.9
+torch >= 2.0
+transformers >= 4.30
+sklearn
+numpy
+joblib
+```
+
+### 评估冻结 E5 基线
+
+```bash
+python3 scripts/evaluate_rank_embedding.py \
+  --feature-dir <path_to_features> \
+  --output-dir runs/rank_embedding_e5_v1
+```
+
+### 训练其他基线
+
+```bash
+# TF-IDF + 结构特征基线
+python3 scripts/train_rank_baseline.py
+
+# 非线性树模型
+python3 scripts/train_rank_tree.py
+
+# 混合模型（E5 + 结构特征）
+python3 scripts/train_rank_hybrid.py
+```
+
+### 统一推理接口
+
+```python
+from scripts.rank_inference import RankingBaseline
+
+# 加载模型
+baseline = RankingBaseline(model_path="runs/rank_embedding_e5_v1")
+
+# 打分
+queries = ["如何配置代理服务器？"]
+memories = ["在 git config 中设置 http.proxy 和 https.proxy"]
+scores = baseline.score(queries, memories)
+```
+
+## 实验报告
+
+- [TF-IDF + 结构特征基线](docs/rank-baseline-report.md)
+- [Pairwise 排序基线](docs/rank-pairwise-baseline-v1.md)
+- [特征消融实验](docs/rank-pairwise-ablation-v1.md)
+- [非线性树模型](docs/rank-tree-baseline-v1.md)
+- [冻结 E5 语义基线](docs/rank-e5-frozen-v1.md)
+- [Baseline 选择报告](docs/baseline-selection-report.md)
+
+## 数据政策
+
+当前所有基线训练只使用 AlpsBench 公开数据集的训练和验证切分。私有弱监督标签已排除在训练和模型选择之外，仅作域迁移诊断。
+
+## 下一步工作
+
+1. 完成混合 ranker 训练与评估
+2. 集成 scope/path/validity 特征
+3. 在真实 `retrieved → cited → corrected` trace 上评估
+4. Shadow mode 部署
+5. 其他专家模块（RETRIEVE、WRITE、UPDATE）
 
 ## 隐私与安全
 
