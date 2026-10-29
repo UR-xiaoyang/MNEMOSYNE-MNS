@@ -55,15 +55,16 @@ EGRESS      本地/云端投递策略
 | TF-IDF cosine | Lexical | 0.3916 | Baseline |
 | Pairwise logistic | Linear structured | 0.4090 | Baseline |
 | Pairwise tree | Nonlinear structured | 0.4278 | Baseline |
-| **Frozen E5** | **Semantic** | **0.5146** | **✓ Recommended** |
-| Hybrid E5+features | Semantic + structured | TBD | Training |
+| Frozen E5 | Semantic | 0.5146 | Baseline |
+| **Hybrid E5+features** | **Semantic + structured** | **0.5796** | **✓ Recommended** |
 
-推荐基线：**MNEMOSYNE-MNS-RANK-E5-FROZEN-01**
+推荐基线：**MNEMOSYNE-MNS-RANK-HYBRID-01**
 
-- Encoder: `intfloat/multilingual-e5-small` (frozen weights)
-- Training: AlpsBench public train split only
-- Validation: 312 queries, NDCG@10 = 0.5146
+- Components: Frozen E5 (`intfloat/multilingual-e5-small`) + 12 structured features
+- Training: AlpsBench public train split, pairwise logistic ranker
+- Validation: 312 queries, NDCG@10 = 0.5796, Recall@1 = 0.4071
 - Inference: CPU, no GPU required
+- Training time: ~41 minutes
 - Multilingual: Chinese + English
 
 详细报告：[docs/baseline-selection-report.md](docs/baseline-selection-report.md)

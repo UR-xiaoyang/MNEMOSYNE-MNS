@@ -4,7 +4,7 @@
 
 This report compares all trained ranking baselines on the AlpsBench public validation set and selects the recommended baseline for the `RANK` expert in the MNEMOSYNE-MNS system.
 
-**Recommended baseline:** `MNEMOSYNE-MNS-RANK-E5-FROZEN-01`
+**Recommended baseline:** `MNEMOSYNE-MNS-RANK-HYBRID-01`
 
 ## Evaluation Protocol
 
@@ -22,52 +22,61 @@ This report compares all trained ranking baselines on the AlpsBench public valid
 | TF-IDF cosine | Lexical baseline | 0.2660 | 0.4583 | 0.5321 | 0.3628 | 0.3916 | 0s |
 | Pairwise logistic | Linear structured | 0.2788 | 0.4647 | 0.5705 | 0.3734 | 0.4090 | <1s |
 | Pairwise tree | Nonlinear structured | 0.2885 | 0.4872 | 0.6026 | 0.3878 | 0.4278 | ~49s |
-| **Frozen E5** | **Semantic** | **0.3109** | **0.6250** | **0.7308** | **0.4574** | **0.5146** | **~85s** |
-| Hybrid E5+features | Semantic + structured | TBD | TBD | TBD | TBD | TBD | TBD |
+| Frozen E5 | Semantic | 0.3109 | 0.6250 | 0.7308 | 0.4574 | 0.5146 | ~85s |
+| **Hybrid E5+features** | **Semantic + structured** | **0.4071** | **0.6699** | **0.7756** | **0.5287** | **0.5796** | **~41min** |
 
 ## Analysis
 
-### Why E5 is recommended
+### Why Hybrid is recommended
 
-1. **Strongest retrieval performance**: E5 achieves the highest metrics across all ranks.
-2. **No fine-tuning required**: Uses frozen `intfloat/multilingual-e5-small` weights, avoiding overfitting risk on the small public training set.
-3. **Multilingual support**: Handles Chinese and English queries and memories uniformly.
-4. **Inference cost acceptable**: CPU inference at ~85s for 312 queries is viable for development baseline.
+1. **Strongest performance**: Hybrid achieves the highest metrics across all ranks, including **Recall@1 = 0.4071** and **NDCG@10 = 0.5796**.
+2. **Combines semantic and lexical signals**: E5 embeddings provide multilingual semantic understanding; structured features (TF-IDF, containment, length, cues) add lexical precision and metadata context.
+3. **Statistically robust improvement over E5**: Bootstrap shows all gains are significant (P ≥ 0.98).
+4. **CPU training and inference**: No GPU required; 41-minute training is acceptable for baseline development.
 
-### Statistical confidence
+### Statistical confidence: Hybrid vs Frozen E5
 
-3,000-resample query-level paired bootstrap comparing E5 to pairwise tree:
+3,000-resample query-level paired bootstrap:
 
-| Metric | E5 advantage | 95% interval | P(E5 > tree) |
+| Metric | Hybrid advantage | 95% interval | P(Hybrid > E5) |
 |---|---:|---:|---:|
-| Recall@5 | +0.1378 | [+0.0737, +0.2019] | 1.000 |
-| Recall@10 | +0.1282 | [+0.0673, +0.1923] | 1.000 |
-| MRR | +0.0696 | [+0.0213, +0.1175] | 0.996 |
-| NDCG@10 | +0.0869 | [+0.0384, +0.1363] | 1.000 |
+| Recall@1 | +0.0962 | **[+0.0449, +0.1474]** | **0.999** |
+| Recall@5 | +0.0449 | **[+0.0032, +0.0865]** | **0.980** |
+| Recall@10 | +0.0449 | **[+0.0064, +0.0833]** | **0.986** |
+| MRR | +0.0713 | **[+0.0383, +0.1065]** | **1.000** |
+| NDCG@10 | +0.0649 | **[+0.0342, +0.0965]** | **1.000** |
 
-The E5 gain is statistically robust for Recall@5+, MRR, and NDCG@10.
+The hybrid gain is statistically resolved across all metrics.
 
 ### Limitations acknowledged
 
-- **Top-1 recall not resolved**: Recall@1 confidence interval crosses zero. For single-memory context budgets, further filtering is needed.
 - **Validation set is small and task-specific**: 312 queries from AlpsBench may not represent real `retrieved → cited → corrected` runtime traces.
-- **No scope/path/validity features**: E5 only sees text. System-native metadata (scope, authority, version, staleness) is not yet included.
+- **No scope/path/validity features**: The hybrid model uses only text and basic structured features. System-native metadata (scope, authority, version, staleness) is not yet included.
+- **Training time**: 41 minutes is acceptable for development but longer than frozen E5. For rapid iteration, E5 remains a viable fallback.
 
 ## Decision
 
 The recommended production path is:
 
 ```text
-1. E5 semantic recall (current baseline)
-2. + scope/path/validity hard filters
-3. + hybrid reranker (E5 + structured features)
-4. + context admission with redundancy/conflict/budget constraints
+1. Hybrid E5 + structured features (current baseline)
+2. + scope/path/validity/authority hard filters
+3. + context admission with redundancy/conflict/budget constraints
+4. Shadow mode deployment with real trace collection
 ```
 
-Only after this pipeline is tested with real runtime traces should GPU Cross-Encoder fine-tuning be considered.
+Only after this pipeline is tested with real `retrieved → cited → corrected` traces should GPU Cross-Encoder fine-tuning be considered.
 
 ## Baseline artifact locations
 
+**Hybrid (recommended):**
+```text
+runs/rank_hybrid_v1/hybrid_report.json
+runs/rank_hybrid_v1/hybrid_ranker.joblib
+runs/rank_hybrid_v1/validation_predictions.jsonl
+```
+
+**Frozen E5 (fallback):**
 ```text
 runs/rank_embedding_e5_v1/embedding_report.json
 runs/rank_embedding_e5_v1/query_embeddings.npy
@@ -77,12 +86,26 @@ runs/rank_embedding_e5_v1/validation_predictions.jsonl
 
 ## Reproducibility
 
-All training scripts, evaluation protocols, and bootstrap comparisons are version-controlled in this repository. The frozen E5 baseline requires no training and can be reproduced by running:
+All training scripts, evaluation protocols, and bootstrap comparisons are version-controlled in this repository.
+
+**To reproduce the hybrid baseline:**
+
+```bash
+python3 scripts/train_rank_hybrid.py \
+  --feature-dir C:/Users/xiaoyang/memory_dataset/features_v1 \
+  --e5-model intfloat/multilingual-e5-small \
+  --output-dir runs/rank_hybrid_v1
+```
+
+CPU-only; no GPU required. Training takes approximately 41 minutes on the reference system.
+
+**To reproduce the frozen E5 baseline:**
 
 ```bash
 python3 scripts/evaluate_rank_embedding.py \
   --feature-dir C:/Users/xiaoyang/memory_dataset/features_v1 \
+  --model intfloat/multilingual-e5-small \
   --output-dir runs/rank_embedding_e5_v1
 ```
 
-CPU-only; no GPU required.
+No training required; inference only (~85 seconds).
