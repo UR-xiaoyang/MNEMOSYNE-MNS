@@ -60,6 +60,7 @@ RANK 专家的完整 API 已实现并可用于生产环境集成。
 - ✅ **记忆写入 API** — `/memories` 持久化写入，`/retrieve_store` 从本地库召回并排序
 - ✅ **模型 bundle** — TF-IDF vectorizer、ranker、E5 目录可离线打包
 - ✅ **Context Assembly** — token budget、近重复去重、conflicted/superseded 过滤和冲突链排除
+- ✅ **ROUTE baseline** — 分类路径、authority 需求、低置信度慢回退信号
 
 ### 使用示例
 

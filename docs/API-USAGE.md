@@ -71,7 +71,26 @@ curl -X POST http://localhost:8000/retrieve_store \
 
 `MemoryStore` applies scope, egress, superseded/deprecated and strict-conflict filters before ranking. In Docker, mount `/app/data` so `memory.db` survives container replacement.
 
+### ROUTE / WRITE / UPDATE
 
+```bash
+# Route only; does not retrieve or write
+curl -X POST http://localhost:8000/route \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"继续上次关于记忆调度的方案","scope_level":"session"}'
+
+# Generate a proposal; does not commit a memory
+curl -X POST http://localhost:8000/write_proposals \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"请记住：我偏好使用中文回复。","scope_level":"project"}'
+
+# Explicitly supersede an existing memory
+curl -X POST http://localhost:8000/memories/supersede \
+  -H 'Content-Type: application/json' \
+  -d '{"old_id":"m-old","new_id":"m-new","content":"新的代理配置","scope_level":"global","destination":"local"}'
+```
+
+`/write_proposals` is intentionally proposal-only. Long-term writes require an explicit `/memories` call; superseding requires the dedicated update endpoint.
 
 ```python
 from shadow_mode import ShadowModeCollector
