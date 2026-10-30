@@ -11,9 +11,24 @@ The deployable Hybrid ranker now preserves the training-time TF-IDF vectorizer. 
 - validates the feature shape before scoring;
 - keeps model weights and the E5 directory outside Git.
 
+## Download the recommended bundle from Hugging Face
+
+The verified public bundle is available at:
+
+```text
+https://huggingface.co/UR-xiaoyang/mnemosyne-mns-rank-hybrid-01
+```
+
+```bash
+huggingface-cli download UR-xiaoyang/mnemosyne-mns-rank-hybrid-01 \
+  --local-dir deploy
+```
+
+The repository includes the ranker, fitted TF-IDF vectorizer, frozen E5 snapshot, model metadata and SHA-256 manifest. It does not include private conversations or local memory databases.
+
 ## Prepare a self-contained Docker build context
 
-The private/local training artifacts are intentionally ignored by Git. Prepare them locally:
+The private/local training artifacts are intentionally ignored by Git; you can either download the verified bundle above or generate the same layout from local training artifacts:
 
 ```bash
 python3 scripts/prepare_deployment.py \

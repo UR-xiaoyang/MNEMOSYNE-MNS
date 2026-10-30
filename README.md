@@ -163,7 +163,27 @@ scores = baseline.score(queries, memories)
 - [冻结 E5 语义基线](docs/rank-e5-frozen-v1.md)
 - [Baseline 选择报告](docs/baseline-selection-report.md)
 
-## 可移植部署
+## 从 Hugging Face 获取模型 bundle
+
+推荐模型 bundle 已发布到：
+
+```text
+https://huggingface.co/UR-xiaoyang/mnemosyne-mns-rank-hybrid-01
+```
+
+下载并部署：
+
+```bash
+huggingface-cli download UR-xiaoyang/mnemosyne-mns-rank-hybrid-01 \
+  --local-dir deploy
+
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+MNEMOSYNE_E5_MODEL=$PWD/deploy/e5_model \
+python3 -m uvicorn docker.server:app --host 0.0.0.0 --port 8000
+```
+
+仓库只包含公开 AlpsBench 训练得到的 RANK bundle；私有对话数据、私有历史和本地 SQLite 数据库不在其中。
+
 
 模型权重和 E5 模型目录不进入 Git。先准备本地部署 bundle：
 

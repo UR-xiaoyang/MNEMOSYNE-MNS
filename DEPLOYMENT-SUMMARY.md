@@ -18,6 +18,8 @@
 - ✅ 跨平台（Linux/Mac/Windows）
 - ✅ 易于扩展和版本管理
 
+**模型 bundle：** https://huggingface.co/UR-xiaoyang/mnemosyne-mns-rank-hybrid-01
+
 **快速开始：** 先准备离线模型 bundle，再构建镜像。
 
 ```bash
