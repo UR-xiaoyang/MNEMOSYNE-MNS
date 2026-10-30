@@ -75,7 +75,8 @@ class ShadowModeCollector:
     def __init__(self, db_path: str | Path = "~/.hermes/shadow_traces.db"):
         self.db_path = Path(db_path).expanduser()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(str(self.db_path))
+        self.conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+        self._write_lock = __import__("threading").RLock()
         self._init_schema()
     
     def _init_schema(self) -> None:
