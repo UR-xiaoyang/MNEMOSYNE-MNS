@@ -147,17 +147,31 @@ scores = baseline.score(queries, memories)
 - [冻结 E5 语义基线](docs/rank-e5-frozen-v1.md)
 - [Baseline 选择报告](docs/baseline-selection-report.md)
 
-## 数据政策
+## 可移植部署
 
-当前所有基线训练只使用 AlpsBench 公开数据集的训练和验证切分。私有弱监督标签已排除在训练和模型选择之外，仅作域迁移诊断。
+模型权重和 E5 模型目录不进入 Git。先准备本地部署 bundle：
 
-## 下一步工作
+```bash
+python3 scripts/export_ranker_bundle.py \
+  --source runs/rank_hybrid_v1 \
+  --vectorizer <path_to_features>/rerank_tfidf_vectorizer.joblib \
+  --destination deploy/model_bundle
+# 将本地 E5 snapshot 复制到 deploy/e5_model/
 
-1. 完成混合 ranker 训练与评估
-2. 集成 scope/path/validity 特征
-3. 在真实 `retrieved → cited → corrected` trace 上评估
-4. Shadow mode 部署
-5. 其他专家模块（RETRIEVE、WRITE、UPDATE）
+docker build -t mnemosyne-mns:portable .
+docker run --rm -p 8000:8000 mnemosyne-mns:portable
+```
+
+完整说明：[docs/PORTABLE-DEPLOYMENT.md](docs/PORTABLE-DEPLOYMENT.md)。Docker 镜像使用离线模型目录，不在启动时联网下载。C++/ONNX 文件目前是参考集成，尚未在本机编译验证，不宣称为独立可执行发布物。
+
+## 验证
+
+```bash
+python3 -m unittest discover -s tests -v
+python3 -m py_compile scripts/*.py docker/server.py
+```
+
+当前 runtime contract 测试覆盖结构化特征、API 记忆 ID 稳定性、模型 bundle 的 vectorizer 保留和路径解析。Docker build 需要 Docker daemon；C++ build 需要 ONNX Runtime 和 tokenizer 依赖。
 
 ## 隐私与安全
 

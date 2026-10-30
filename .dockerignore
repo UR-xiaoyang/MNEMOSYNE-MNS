@@ -1,0 +1,9 @@
+.git
+.gitignore
+runs/
+models/
+__pycache__/
+*.pyc
+*.log
+.env
+.git

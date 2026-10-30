@@ -2,6 +2,20 @@
 
 ## 一键部署（推荐）
 
+### 0. 准备离线模型 bundle
+
+模型权重和 E5 模型目录不上传 Git。先在有训练产物的机器执行：
+
+```bash
+python3 scripts/export_ranker_bundle.py \
+  --source runs/rank_hybrid_v1 \
+  --vectorizer <path_to_features>/rerank_tfidf_vectorizer.joblib \
+  --destination deploy/model_bundle
+# 将本地 E5 snapshot 复制到 deploy/e5_model/
+```
+
+`deploy/model_bundle/` 必须包含 `hybrid_ranker.joblib`、`ranker.json`、`scaler.json`、`metadata.json`；`deploy/e5_model/` 必须包含 E5 的 config、weights 和 tokenizer 文件。两个目录都被 `.gitignore` 排除。
+
 ### 1. 构建镜像
 
 ```bash
@@ -9,7 +23,7 @@ cd /path/to/MNEMOSYNE-MNS
 docker build -t mnemosyne-mns:latest .
 ```
 
-构建时间：约 5-10 分钟（首次会下载 E5 模型）
+构建时间：取决于依赖安装和本地模型 bundle 大小；构建过程不联网下载模型，容器启动也不联网。
 
 ### 2. 运行容器
 

@@ -26,7 +26,11 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parent))
 
 from memory_schema import MemoryEntity, Query, Scope, extract_native_features
-from rank_inference import RankingBaseline
+from rank_inference import RankingBaseline, resolve_model_path
+from structured_features import build_structured_features
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class MemoryPipeline:
@@ -53,7 +57,7 @@ class MemoryPipeline:
             device: "cpu" or "cuda"
             strict_validity: If True, filter out "stale" and "conflicted" memories
         """
-        self.ranker = RankingBaseline(Path(ranker_path), device=device)
+        self.ranker = RankingBaseline(resolve_model_path(ranker_path), device=device)
         self.strict_validity = strict_validity
     
     def retrieve_and_rank(
@@ -109,11 +113,18 @@ class MemoryPipeline:
         queries = [query_text] * len(filtered_candidates)
         memories = [m.content for m in filtered_candidates]
         
-        # If extra_features not provided, use zeros (ranker will only use semantic+native)
+        # Compute the same 12-column structured feature contract used by the
+        # trained hybrid/tree rankers when callers do not supply it.
         if extra_features is None:
-            extra_features = np.zeros((len(filtered_candidates), 12), dtype=np.float32)
-        
-        # Extract native features
+            extra_features, _ = build_structured_features(
+                queries,
+                memories,
+                vectorizer=getattr(self.ranker, "vectorizer", None),
+            )
+        else:
+            extra_features = np.asarray(extra_features, dtype=np.float32)
+            if extra_features.shape != (len(filtered_candidates), 12):
+                raise ValueError("extra_features must have shape [candidate_count, 12]")
         native_features = np.asarray([
             extract_native_features(query, memory)
             for memory in filtered_candidates
@@ -127,11 +138,15 @@ class MemoryPipeline:
         # Note: RankingBaseline.score() expects extra_features = structured features
         # For extended ranker, we need to append native features to extra_features
         if self.ranker.model_id == "MNEMOSYNE-MNS-RANK-EXTENDED-01":
+            if extra_features is None:
+                raise ValueError("Extended ranker requires explicit 12 structured features plus native features")
             combined_extra = np.concatenate([extra_features, native_features], axis=1)
         else:
             combined_extra = extra_features
-        
+
         scores = self.ranker.score(queries, memories, combined_extra)
+        structured_for_results = extra_features
+
         
         # Step 4: Rank and select top-K
         ranked_indices = np.argsort(scores)[::-1][:top_k]
@@ -148,7 +163,7 @@ class MemoryPipeline:
                 "injected": True,  # Will be determined by budget assembly
                 "features": {
                     "native": native_features[idx].tolist(),
-                    "structured": extra_features[idx].tolist() if extra_features is not None else [],
+                    "structured": structured_for_results[idx].tolist() if structured_for_results is not None else [],
                 },
                 "metadata": {
                     "scope": memory.scope.level,
@@ -211,7 +226,7 @@ def create_pipeline(model_name: str = "hybrid") -> MemoryPipeline:
         Configured MemoryPipeline
     """
     model_paths = {
-        "hybrid": "runs/rank_hybrid_v1",
+        "hybrid": "deploy/model_bundle" if (PROJECT_ROOT / "deploy/model_bundle").is_dir() else "runs/rank_hybrid_v1",
         "extended": "runs/rank_extended_v1",
         "e5": "runs/rank_embedding_e5_v1",
         "tree": "runs/rank_pairwise_tree_v1",

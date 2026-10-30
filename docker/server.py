@@ -10,11 +10,14 @@ import sys
 from pathlib import Path
 from typing import List, Optional
 
-# Add scripts to path
-sys.path.insert(0, str(Path(__file__).parent / "scripts"))
+# Add project scripts to path. Works both from the source tree and /app in Docker.
+PROJECT_ROOT = Path(__file__).resolve().parent
+if not (PROJECT_ROOT / "scripts").is_dir():
+    PROJECT_ROOT = PROJECT_ROOT.parent
+sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 from memory_pipeline import create_pipeline
-from memory_schema import synthesize_native_metadata_for_alpsbench, MemoryEntity, Scope
+from memory_schema import memory_from_api
 from shadow_mode import ShadowModeCollector
 from citation_detection import detect_citations_in_response
 
@@ -92,12 +95,13 @@ async def retrieve(req: RetrievalRequest):
         
         # Convert to MemoryEntity objects
         candidates = [
-            synthesize_native_metadata_for_alpsbench(
+            memory_from_api(
+                memory.id,
                 memory.content,
-                index=i,
-                dataset="api"
+                destination=req.destination,
+                scope_level=req.scope_level,
             )
-            for i, memory in enumerate(req.memories)
+            for memory in req.memories
         ]
         
         # Retrieve and rank
@@ -115,9 +119,8 @@ async def retrieve(req: RetrievalRequest):
         # Map back to original IDs
         response_results = []
         for result in assembled:
-            original_idx = int(result["memory_id"].split("_")[-1])
             response_results.append({
-                "memory_id": req.memories[original_idx].id,
+                "memory_id": result["memory_id"],
                 "content": result["content"],
                 "rank": result["rank"],
                 "score": result["score"],

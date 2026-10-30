@@ -18,18 +18,21 @@
 - ✅ 跨平台（Linux/Mac/Windows）
 - ✅ 易于扩展和版本管理
 
-**快速开始：**
+**快速开始：** 先准备离线模型 bundle，再构建镜像。
 
 ```bash
-# 1. 构建镜像
-docker build -t mnemosyne-mns:latest .
+python3 scripts/prepare_deployment.py \
+  --source runs/rank_hybrid_v1 \
+  --vectorizer <path_to_features>/rerank_tfidf_vectorizer.joblib \
+  --e5-source <path_to_local_e5_snapshot> \
+  --destination deploy
 
-# 2. 运行服务
-docker run -d -p 8000:8000 --name mnemosyne mnemosyne-mns:latest
-
-# 3. 测试
+docker build -t mnemosyne-mns:portable .
+docker run -d -p 8000:8000 --name mnemosyne mnemosyne-mns:portable
 curl http://localhost:8000/health
 ```
+
+模型 bundle 不进入 Git；构建和启动均不联网下载模型。
 
 **详细文档：** [docs/DOCKER-QUICKSTART.md](docs/DOCKER-QUICKSTART.md)
 
@@ -55,25 +58,7 @@ results = pipeline.retrieve_and_rank(...)
 
 ---
 
-### 方案 3：C++ + ONNX（⭐⭐⭐ 高性能）
-
-**适用场景：** 性能关键、嵌入式部署
-
-**步骤：**
-
-```bash
-# 1. 导出模型
-python3 scripts/export_to_onnx.py
-
-# 2. 编译 C++ 代码
-cd cpp
-g++ -std=c++17 mnemosyne_inference.cpp -lonnxruntime -o mnemosyne
-
-# 3. 运行
-./mnemosyne
-```
-
-**详细文档：** [docs/CPP-DEPLOYMENT.md](docs/CPP-DEPLOYMENT.md)
+**C++ status:** `cpp/mnemosyne_inference.cpp` is a reference ONNX Runtime integration. It is not a verified standalone executable until ONNX Runtime, SentencePiece/tokenizer support, and a target-platform build are supplied.
 
 ---
 
@@ -91,22 +76,21 @@ g++ -std=c++17 mnemosyne_inference.cpp -lonnxruntime -o mnemosyne
 
 ### Docker 部署（生产推荐）
 
+先生成本地离线 bundle（模型权重不在 Git）：
+
 ```bash
-# 克隆仓库
-git clone https://github.com/UR-xiaoyang/MNEMOSYNE-MNS.git
-cd MNEMOSYNE-MNS
+python3 scripts/prepare_deployment.py \
+  --source runs/rank_hybrid_v1 \
+  --vectorizer <path_to_features>/rerank_tfidf_vectorizer.joblib \
+  --e5-source <path_to_local_e5_snapshot> \
+  --destination deploy
 
-# 一键部署
-docker build -t mnemosyne-mns:latest .
-docker run -d -p 8000:8000 --name mnemosyne --restart unless-stopped mnemosyne-mns:latest
-
-# 验证
+docker build -t mnemosyne-mns:portable .
+docker run -d -p 8000:8000 --name mnemosyne --restart unless-stopped mnemosyne-mns:portable
 curl http://localhost:8000/health
-# 响应: {"status":"ok","model":"RANK-HYBRID-01","version":"1.0.0"}
-
-# API 文档
-# 访问 http://localhost:8000/docs
 ```
+
+模型目录使用离线模式；容器启动不依赖 Hugging Face 网络。
 
 ### Python 集成（开发环境）
 

@@ -251,3 +251,38 @@ def synthesize_native_metadata_for_alpsbench(memory_text: str, index: int, datas
             import_source="alpsbench",
         ),
     )
+
+
+def memory_from_api(
+    memory_id: str,
+    content: str,
+    *,
+    destination: str = "local",
+    scope_level: Literal["session", "project", "global"] = "global",
+) -> MemoryEntity:
+    """Create deterministic metadata for an API-supplied memory.
+
+    Unlike the offline AlpsBench synthesizer, this constructor never samples
+    usage or timestamps. External IDs remain stable so API responses can map
+    ranked results back to the caller's memory records.
+    """
+    now = time.time()
+    return MemoryEntity(
+        memory_id=memory_id,
+        content=content,
+        created_at=now,
+        updated_at=now,
+        version=1,
+        scope=Scope(level=scope_level),
+        authority=Authority(
+            class_="inferred",
+            priority=30,
+            source="imported",
+            reliability=0.5,
+        ),
+        validity=Validity(state="active", last_verified_at=now),
+        retrieval=Retrieval(path="api/input", tags=["api"]),
+        usage=Usage(),
+        egress=Egress(allowed_destinations=[destination], sensitivity="private"),
+        provenance=Provenance(created_by="import", import_source="api"),
+    )

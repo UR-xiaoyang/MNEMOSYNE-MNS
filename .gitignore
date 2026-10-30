@@ -16,6 +16,7 @@ raw_data/
 # Model artifacts and training outputs
 checkpoints/
 models/
+deploy/
 weights/
 artifacts/
 outputs/
