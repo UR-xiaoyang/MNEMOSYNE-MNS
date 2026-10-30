@@ -21,9 +21,9 @@ from memory_pipeline import create_pipeline
 from memory_schema import memory_from_api
 from memory_store import MemoryStore
 from shadow_mode import ShadowModeCollector
+from shadow_runtime import record_retrieval
 from citation_detection import detect_citations_in_response
 from write_gate import proposal_payload
-
 app = FastAPI(
     title="MNEMOSYNE-MNS",
     description="Memory Ranking Service for Agent Memory Systems",
@@ -45,6 +45,9 @@ pipeline = create_pipeline("hybrid")
 print("✓ Model loaded successfully")
 
 shadow_collector = None
+shadow_enabled = os.environ.get("MNEMOSYNE_SHADOW_MODE", "0") == "1"
+if shadow_enabled:
+    shadow_collector = ShadowModeCollector(os.environ.get("MNEMOSYNE_SHADOW_DB", str(PROJECT_ROOT / "shadow_traces.db")))
 memory_store = MemoryStore(os.environ.get("MNEMOSYNE_DB", str(PROJECT_ROOT / "memory.db")))
 
 
@@ -59,6 +62,8 @@ class RetrievalRequest(BaseModel):
     top_k: int = Field(default=10, ge=1, le=100)
     scope_level: str = Field(default="global", pattern="^(session|project|global)$")
     destination: str = Field(default="local")
+    session_id: str | None = None
+    turn_id: str | None = None
 
 
 class RetrievalResponse(BaseModel):
@@ -143,7 +148,16 @@ async def retrieve(req: RetrievalRequest):
         
         # Assemble context
         assembled = pipeline.assemble_context(results, max_tokens=4000)
-        
+        record_retrieval(
+            shadow_collector,
+            enabled=shadow_enabled and req.session_id is not None and req.turn_id is not None,
+            session_id=req.session_id or "",
+            turn_id=req.turn_id or "",
+            query={"text": req.query, "scope": {"level": req.scope_level}, "destination": req.destination},
+            candidates=results,
+            metadata={"ranker_model_id": pipeline.ranker.model_id, "injected_count": len(assembled)},
+        )
+
         # Map back to original IDs
         response_results = []
         for result in assembled:
