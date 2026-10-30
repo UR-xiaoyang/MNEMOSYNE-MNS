@@ -22,7 +22,7 @@ from memory_schema import memory_from_api
 from memory_store import MemoryStore
 from memory_service import MemoryService
 from shadow_mode import ShadowModeCollector
-from shadow_runtime import record_retrieval
+from shadow_runtime import record_citation, record_correction, record_retrieval
 from citation_detection import detect_citations_in_response
 from route_baseline import route_query
 from conflict_detection import find_conflicts
@@ -73,6 +73,7 @@ class RetrievalRequest(BaseModel):
 class RetrievalResponse(BaseModel):
     results: List[dict]
     latency_ms: float
+    retrieval_event_id: str | None = None
 
 
 class MemoryWriteRequest(BaseModel):
@@ -107,6 +108,25 @@ class CitationRequest(BaseModel):
 
 class CitationResponse(BaseModel):
     citations: List[dict]
+
+
+class CitationLogRequest(BaseModel):
+    session_id: str
+    turn_id: str
+    retrieval_event_id: str
+    memory_id: str
+    citation: dict
+    original_rank: int
+    context_position: int | None = None
+
+
+class CorrectionLogRequest(BaseModel):
+    session_id: str
+    turn_id: str
+    citation_event_id: str
+    memory_id: str
+    correction_type: str
+    feedback: dict
 
 
 @app.get("/health")
@@ -152,7 +172,7 @@ async def retrieve(req: RetrievalRequest):
         
         # Assemble context
         assembled = pipeline.assemble_context(results, max_tokens=4000)
-        record_retrieval(
+        retrieval_event_id = record_retrieval(
             shadow_collector,
             enabled=shadow_enabled and req.session_id is not None and req.turn_id is not None,
             session_id=req.session_id or "",
@@ -178,7 +198,8 @@ async def retrieve(req: RetrievalRequest):
         
         return RetrievalResponse(
             results=response_results,
-            latency_ms=round(latency, 2)
+            latency_ms=round(latency, 2),
+            retrieval_event_id=retrieval_event_id,
         )
     
     except Exception as e:
@@ -261,6 +282,48 @@ async def write_proposals(req: WriteProposalRequest):
     return {"proposals": proposal_payload(req.text, scope_level=req.scope_level)}
 
 
+@app.post("/shadow/citations")
+async def log_citation(req: CitationLogRequest):
+    event_id = record_citation(
+        shadow_collector,
+        enabled=shadow_enabled,
+        session_id=req.session_id,
+        turn_id=req.turn_id,
+        retrieval_event_id=req.retrieval_event_id,
+        memory_id=req.memory_id,
+        citation=req.citation,
+        original_rank=req.original_rank,
+        context_position=req.context_position,
+    )
+    if event_id is None:
+        raise HTTPException(status_code=409, detail="shadow mode is disabled")
+    return {"event_id": event_id}
+
+
+@app.post("/shadow/corrections")
+async def log_correction(req: CorrectionLogRequest):
+    event_id = record_correction(
+        shadow_collector,
+        enabled=shadow_enabled,
+        session_id=req.session_id,
+        turn_id=req.turn_id,
+        citation_event_id=req.citation_event_id,
+        memory_id=req.memory_id,
+        correction_type=req.correction_type,
+        feedback=req.feedback,
+    )
+    if event_id is None:
+        raise HTTPException(status_code=409, detail="shadow mode is disabled")
+    return {"event_id": event_id}
+
+
+@app.get("/shadow/metrics")
+def shadow_metrics(session_id: str | None = None):
+    if not shadow_enabled or shadow_collector is None:
+        raise HTTPException(status_code=409, detail="shadow mode is disabled")
+    return shadow_collector.compute_metrics(session_id)
+
+
 @app.post("/detect_citations", response_model=CitationResponse)
 async def detect_citations(req: CitationRequest):
     """
@@ -314,6 +377,9 @@ def root():
             "route": "/route",
             "conflicts": "/conflicts",
             "write_proposals": "/write_proposals",
+            "shadow_citations": "/shadow/citations",
+            "shadow_corrections": "/shadow/corrections",
+            "shadow_metrics": "/shadow/metrics",
             "detect_citations": "/detect_citations",
             "models": "/models",
             "docs": "/docs"
