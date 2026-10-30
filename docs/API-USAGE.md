@@ -53,7 +53,25 @@ for memory in assembled:
     print(f"  Authority: {memory['metadata']['authority_class']}")
 ```
 
-### 2. Shadow Mode 追踪
+### Persistent MemoryStore
+
+The service exposes a local SQLite-backed store:
+
+```bash
+# Write or update a memory
+curl -X POST http://localhost:8000/memories \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"m-1","content":"配置代理服务器","scope_level":"global","destination":"local"}'
+
+# Search the store, then rank the visible candidates
+curl -X POST http://localhost:8000/retrieve_store \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"代理","memories":[],"top_k":5,"scope_level":"global","destination":"local"}'
+```
+
+`MemoryStore` applies scope, egress, superseded/deprecated and strict-conflict filters before ranking. In Docker, mount `/app/data` so `memory.db` survives container replacement.
+
+
 
 ```python
 from shadow_mode import ShadowModeCollector

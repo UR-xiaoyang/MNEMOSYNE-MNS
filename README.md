@@ -56,7 +56,9 @@ RANK 专家的完整 API 已实现并可用于生产环境集成。
 - ✅ **训练好的 Ranker** — Hybrid 模型（NDCG@10 = 0.5796）
 - ✅ **Shadow Mode** — 本地 trace 收集与生产指标计算
 - ✅ **Citation 检测** — 启发式引用检测
-- ✅ **记忆实体 Schema** — 完整元数据（scope / authority / validity / usage）
+- ✅ **RETRIEVE 基础层** — SQLite 记忆存储、FTS/子串召回、scope/egress/validity 过滤
+- ✅ **记忆写入 API** — `/memories` 持久化写入，`/retrieve_store` 从本地库召回并排序
+- ✅ **模型 bundle** — TF-IDF vectorizer、ranker、E5 目录可离线打包
 
 ### 使用示例
 
@@ -84,7 +86,19 @@ for memory in assembled:
 
 完整 API 文档：[docs/API-USAGE.md](docs/API-USAGE.md)
 
-### 性能
+### 持久化记忆 API
+
+```bash
+curl -X POST http://localhost:8000/memories \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"m-1","content":"配置代理服务器","scope_level":"global","destination":"local"}'
+
+curl -X POST http://localhost:8000/retrieve_store \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"代理","memories":[],"top_k":5,"scope_level":"global","destination":"local"}'
+```
+
+容器将 SQLite 数据库保存在 `/app/data/memory.db`；生产部署应挂载持久卷。
 
 - **端到端延迟**：~600ms / 100 候选（CPU）
 - **NDCG@10**：0.5796（AlpsBench 验证集）
@@ -171,7 +185,7 @@ python3 -m unittest discover -s tests -v
 python3 -m py_compile scripts/*.py docker/server.py
 ```
 
-当前 runtime contract 测试覆盖结构化特征、API 记忆 ID 稳定性、模型 bundle 的 vectorizer 保留和路径解析。Docker build 需要 Docker daemon；C++ build 需要 ONNX Runtime 和 tokenizer 依赖。
+当前 runtime/deployment/memory-store contract 测试覆盖结构化特征、API 记忆 ID 稳定性、模型 bundle 的 vectorizer 保留、路径解析和 SQLite 召回过滤。Docker build 需要 Docker daemon；C++ build 需要 ONNX Runtime 和 tokenizer 依赖。
 
 ## 隐私与安全
 

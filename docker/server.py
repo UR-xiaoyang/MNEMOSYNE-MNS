@@ -6,6 +6,7 @@ Docker-ready production deployment.
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+import os
 import sys
 from pathlib import Path
 from typing import List, Optional
@@ -18,6 +19,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 from memory_pipeline import create_pipeline
 from memory_schema import memory_from_api
+from memory_store import MemoryStore
 from shadow_mode import ShadowModeCollector
 from citation_detection import detect_citations_in_response
 
@@ -41,8 +43,8 @@ print("Loading RANK-HYBRID-01 model...")
 pipeline = create_pipeline("hybrid")
 print("✓ Model loaded successfully")
 
-# Optional shadow mode (disabled by default)
 shadow_collector = None
+memory_store = MemoryStore(os.environ.get("MNEMOSYNE_DB", str(PROJECT_ROOT / "memory.db")))
 
 
 class Memory(BaseModel):
@@ -61,6 +63,18 @@ class RetrievalRequest(BaseModel):
 class RetrievalResponse(BaseModel):
     results: List[dict]
     latency_ms: float
+
+
+class MemoryWriteRequest(BaseModel):
+    id: str
+    content: str
+    scope_level: str = Field(default="global", pattern="^(session|project|global)$")
+    destination: str = Field(default="local")
+
+
+class MemoryWriteResponse(BaseModel):
+    memory_id: str
+    version: int
 
 
 class CitationRequest(BaseModel):
@@ -139,6 +153,42 @@ async def retrieve(req: RetrievalRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/memories", response_model=MemoryWriteResponse)
+async def write_memory(req: MemoryWriteRequest):
+    memory = memory_from_api(req.id, req.content, destination=req.destination, scope_level=req.scope_level)
+    existing = memory_store.get(req.id)
+    if existing is not None:
+        memory.version = existing.version + 1
+    memory_store.upsert(memory)
+    return MemoryWriteResponse(memory_id=memory.memory_id, version=memory.version)
+
+
+@app.post("/retrieve_store", response_model=RetrievalResponse)
+async def retrieve_store(req: RetrievalRequest):
+    candidates = memory_store.search_candidates(
+        req.query,
+        scope_level=req.scope_level,
+        destination=req.destination,
+        limit=max(req.top_k * 10, 100),
+    )
+    if not candidates:
+        return RetrievalResponse(results=[], latency_ms=0.0)
+    import time
+    start = time.time()
+    ranked = pipeline.retrieve_and_rank(
+        query_text=req.query,
+        candidate_memories=candidates,
+        scope_level=req.scope_level,
+        destination=req.destination,
+        top_k=req.top_k,
+    )
+    assembled = pipeline.assemble_context(ranked, max_tokens=4000)
+    return RetrievalResponse(
+        results=assembled,
+        latency_ms=round((time.time() - start) * 1000, 2),
+    )
+
+
 @app.post("/detect_citations", response_model=CitationResponse)
 async def detect_citations(req: CitationRequest):
     """
@@ -186,6 +236,8 @@ def root():
         "endpoints": {
             "health": "/health",
             "retrieve": "/retrieve",
+            "memories": "/memories",
+            "retrieve_store": "/retrieve_store",
             "detect_citations": "/detect_citations",
             "models": "/models",
             "docs": "/docs"

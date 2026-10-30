@@ -8,13 +8,18 @@ from typing import Any
 
 import joblib
 import numpy as np
-import torch
-from transformers import AutoModel, AutoTokenizer
 
 try:
     from structured_features import build_structured_features
 except ModuleNotFoundError:  # Package import: ``from scripts.rank_inference ...``
     from .structured_features import build_structured_features
+
+
+def _load_neural_dependencies():
+    import torch
+    from transformers import AutoModel, AutoTokenizer
+
+    return torch, AutoModel, AutoTokenizer
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -27,10 +32,10 @@ def resolve_model_path(model_path: str | Path) -> Path:
     return path.resolve()
 
 
-def mean_pooling(model_output, attention_mask: torch.Tensor) -> torch.Tensor:
+def mean_pooling(model_output, attention_mask, torch_module):
     token_embeddings = model_output.last_hidden_state
     mask = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-    return (token_embeddings * mask).sum(1) / torch.clamp(mask.sum(1), min=1e-9)
+    return (token_embeddings * mask).sum(1) / torch_module.clamp(mask.sum(1), min=1e-9)
 
 
 class RankingBaseline:
@@ -40,14 +45,17 @@ class RankingBaseline:
         self.model_path = resolve_model_path(model_path)
         if not self.model_path.is_dir():
             raise FileNotFoundError(f"Model directory not found: {self.model_path}")
-        self.device = torch.device(device)
+        self.torch, auto_model, auto_tokenizer = _load_neural_dependencies()
+        self.auto_model = auto_model
+        self.auto_tokenizer = auto_tokenizer
+        self.device = self.torch.device(device)
         self.metadata = json.loads((self.model_path / "metadata.json").read_text(encoding="utf-8"))
         self.model_id = self.metadata["model_id"]
         
         if self.model_id == "MNEMOSYNE-MNS-RANK-E5-FROZEN-01":
             self.encoder_name = os.environ.get("MNEMOSYNE_E5_MODEL", self.metadata["encoder"])
-            self.tokenizer = AutoTokenizer.from_pretrained(self.encoder_name, local_files_only=os.environ.get("HF_HUB_OFFLINE") == "1")
-            self.encoder = AutoModel.from_pretrained(self.encoder_name, local_files_only=os.environ.get("HF_HUB_OFFLINE") == "1").to(self.device)
+            self.tokenizer = self.auto_tokenizer.from_pretrained(self.encoder_name, local_files_only=os.environ.get("HF_HUB_OFFLINE") == "1")
+            self.encoder = self.auto_model.from_pretrained(self.encoder_name, local_files_only=os.environ.get("HF_HUB_OFFLINE") == "1").to(self.device)
             self.encoder.eval()
             
         elif self.model_id == "MNEMOSYNE-MNS-RANK-HYBRID-01":
@@ -72,8 +80,8 @@ class RankingBaseline:
                 self.vectorizer = None
             self.encoder_name = os.environ.get("MNEMOSYNE_E5_MODEL", self.encoder_name)
             offline = os.environ.get("HF_HUB_OFFLINE") == "1"
-            self.tokenizer = AutoTokenizer.from_pretrained(self.encoder_name, local_files_only=offline)
-            self.encoder = AutoModel.from_pretrained(self.encoder_name, local_files_only=offline).to(self.device)
+            self.tokenizer = self.auto_tokenizer.from_pretrained(self.encoder_name, local_files_only=offline)
+            self.encoder = self.auto_model.from_pretrained(self.encoder_name, local_files_only=offline).to(self.device)
             self.encoder.eval()
             
         elif self.model_id == "MNEMOSYNE-MNS-RANK-TREE-01":
@@ -89,13 +97,13 @@ class RankingBaseline:
     def encode_text(self, texts: list[str], prefix: str, batch_size: int = 64, max_length: int = 256) -> np.ndarray:
         """Encode texts using E5 with proper prefix."""
         result: list[np.ndarray] = []
-        with torch.inference_mode():
+        with self.torch.inference_mode():
             for start in range(0, len(texts), batch_size):
                 batch = [prefix + text for text in texts[start : start + batch_size]]
                 encoded = self.tokenizer(batch, padding=True, truncation=True, max_length=max_length, return_tensors="pt")
                 encoded = {key: value.to(self.device) for key, value in encoded.items()}
-                pooled = mean_pooling(self.encoder(**encoded), encoded["attention_mask"])
-                pooled = torch.nn.functional.normalize(pooled, p=2, dim=1)
+                pooled = mean_pooling(self.encoder(**encoded), encoded["attention_mask"], self.torch)
+                pooled = self.torch.nn.functional.normalize(pooled, p=2, dim=1)
                 result.append(pooled.cpu().numpy().astype(np.float32))
         return np.concatenate(result, axis=0) if result else np.empty((0, 0), dtype=np.float32)
     

@@ -29,8 +29,10 @@ ENV MNEMOSYNE_E5_MODEL=/app/models/multilingual-e5-small
 ENV HF_HUB_OFFLINE=1
 ENV TRANSFORMERS_OFFLINE=1
 ENV PYTHONPATH=/app/scripts
+ENV MNEMOSYNE_DB=/app/data/memory.db
 
-# Expose port
+RUN mkdir -p /app/data
+VOLUME ["/app/data"]
 EXPOSE 8000
 
 # Health check

@@ -267,13 +267,18 @@ def memory_from_api(
     ranked results back to the caller's memory records.
     """
     now = time.time()
+    visibility = {
+        "session": ["session"],
+        "project": ["session", "project"],
+        "global": ["session", "project", "global"],
+    }[scope_level]
     return MemoryEntity(
         memory_id=memory_id,
         content=content,
         created_at=now,
         updated_at=now,
         version=1,
-        scope=Scope(level=scope_level),
+        scope=Scope(level=scope_level, visibility=visibility),
         authority=Authority(
             class_="inferred",
             priority=30,
