@@ -77,6 +77,14 @@ class MemoryWriteResponse(BaseModel):
     version: int
 
 
+class MemorySupersedeRequest(BaseModel):
+    old_id: str
+    new_id: str
+    content: str
+    scope_level: str = Field(default="global", pattern="^(session|project|global)$")
+    destination: str = Field(default="local")
+
+
 class CitationRequest(BaseModel):
     response: str
     injected_memories: List[Memory]
@@ -163,6 +171,16 @@ async def write_memory(req: MemoryWriteRequest):
     return MemoryWriteResponse(memory_id=memory.memory_id, version=memory.version)
 
 
+@app.post("/memories/supersede", response_model=MemoryWriteResponse)
+async def supersede_memory(req: MemorySupersedeRequest):
+    replacement = memory_from_api(req.new_id, req.content, destination=req.destination, scope_level=req.scope_level)
+    try:
+        updated = memory_store.supersede(req.old_id, replacement)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return MemoryWriteResponse(memory_id=updated.memory_id, version=updated.version)
+
+
 @app.post("/retrieve_store", response_model=RetrievalResponse)
 async def retrieve_store(req: RetrievalRequest):
     candidates = memory_store.search_candidates(
@@ -237,6 +255,7 @@ def root():
             "health": "/health",
             "retrieve": "/retrieve",
             "memories": "/memories",
+            "memories_supersede": "/memories/supersede",
             "retrieve_store": "/retrieve_store",
             "detect_citations": "/detect_citations",
             "models": "/models",

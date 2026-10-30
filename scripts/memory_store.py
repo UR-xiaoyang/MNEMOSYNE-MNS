@@ -93,8 +93,23 @@ class MemoryStore:
             if memory.hard_filter(scope_level, destination, strict_validity)
         ][:limit]
 
+    def supersede(self, old_memory_id: str, replacement: MemoryEntity) -> MemoryEntity:
+        """Atomically mark the old entity superseded and persist its replacement."""
+        old = self.get(old_memory_id)
+        if old is None:
+            raise KeyError(f"Unknown memory_id: {old_memory_id}")
+        old.validity.state = "superseded"
+        old.validity.superseded_by = replacement.memory_id
+        old.version += 1
+        replacement.version = max(replacement.version, old.version)
+        self.upsert(old)
+        replacement.provenance.parent_memory_id = old_memory_id
+        self.upsert(replacement)
+        return replacement
+
     def close(self) -> None:
         self.connection.close()
+
 
 
 def _fts_query(query: str) -> str:
