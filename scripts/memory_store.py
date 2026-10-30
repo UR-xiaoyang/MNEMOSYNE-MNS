@@ -64,6 +64,7 @@ class MemoryStore:
         limit: int = 100,
         strict_validity: bool = True,
     ) -> list[MemoryEntity]:
+        fetch_limit = max(limit * 10, 100)
         rows = self.connection.execute(
             """
             SELECT m.payload_json
@@ -73,19 +74,19 @@ class MemoryStore:
             ORDER BY m.updated_at DESC
             LIMIT ?
             """,
-            (_fts_query(query), max(limit, 1)),
+            (_fts_query(query), fetch_limit),
         ).fetchall()
         candidates = [_from_payload(json.loads(row["payload_json"])) for row in rows]
         if not candidates:
             like_query = f"%{query.strip()}%"
             rows = self.connection.execute(
                 "SELECT payload_json FROM memories WHERE content LIKE ? ORDER BY updated_at DESC LIMIT ?",
-                (like_query, max(limit, 1)),
+                (like_query, fetch_limit),
             ).fetchall()
             candidates = [_from_payload(json.loads(row["payload_json"])) for row in rows]
         if not candidates:
             rows = self.connection.execute(
-                "SELECT payload_json FROM memories ORDER BY updated_at DESC LIMIT ?", (max(limit, 1),)
+                "SELECT payload_json FROM memories ORDER BY updated_at DESC LIMIT ?", (fetch_limit,)
             ).fetchall()
             candidates = [_from_payload(json.loads(row["payload_json"])) for row in rows]
         return [

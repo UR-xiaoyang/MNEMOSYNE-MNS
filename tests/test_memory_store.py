@@ -51,6 +51,17 @@ class MemoryStoreTest(unittest.TestCase):
             candidates = store.search_candidates("代理", scope_level="global", destination="local", limit=1)
             self.assertEqual([item.memory_id for item in candidates], ["m-proxy"])
             store.close()
+    def test_invalid_recent_memory_does_not_consume_candidate_limit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = MemoryStore(Path(tmp) / "memory.db")
+            valid = memory_from_api("valid", "proxy configuration", destination="local")
+            store.upsert(valid)
+            invalid = memory_from_api("invalid", "proxy configuration", destination="local")
+            invalid.validity.state = "superseded"
+            store.upsert(invalid)
+            candidates = store.search_candidates("proxy", scope_level="global", destination="local", limit=1)
+            self.assertEqual([item.memory_id for item in candidates], ["valid"])
+            store.close()
 
 
 if __name__ == "__main__":
