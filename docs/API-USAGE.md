@@ -163,7 +163,17 @@ if user_corrected:
 collector.close()
 ```
 
-### 3. 生产指标计算
+### Shadow Mode HTTP endpoints
+
+Set `MNEMOSYNE_SHADOW_MODE=1` to enable local trace writes. It is disabled by default.
+
+- `GET /shadow/metrics?session_id=...` — citation/correction counters
+- `POST /shadow/citations` — record a cited memory
+- `POST /shadow/corrections` — record a user correction
+
+A `/retrieve` response includes `retrieval_event_id` when shadow mode is enabled and session/turn IDs are supplied. Citation and correction endpoints return `409` while shadow mode is disabled.
+
+
 
 ```python
 from shadow_mode import ShadowModeCollector
