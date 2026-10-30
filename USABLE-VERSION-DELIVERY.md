@@ -99,13 +99,13 @@ features = extract_native_features(query, memory)  # 14 维原生特征
 | Model | 特征维度 | NDCG@10 | 状态 |
 |---|---:|---:|---|
 | RANK-HYBRID-01 | E5 + 12 结构化 | 0.5796 | ✓ 推荐 |
-| RANK-EXTENDED-01 | E5 + 12 结构化 + 14 原生 | 训练中 | ⏳ 测试 |
+| RANK-EXTENDED-01 | E5 + 12 结构化 + 14 原生 | 未纳入运行时 | ⚠️ 研究实验 |
 | RANK-E5-FROZEN-01 | 纯语义 | 0.5146 | ✓ 备选 |
 | RANK-TREE-01 | 非线性结构化 | 0.4278 | ✓ 基线 |
 
 **推荐生产模型：** `RANK-HYBRID-01`
 
-**扩展模型：** `RANK-EXTENDED-01` 训练中（预计完成时间：后台任务，约 45 分钟）
+**Extended ranker note:** `RANK-EXTENDED-01` is not part of the supported runtime path. The supported production baseline remains `RANK-HYBRID-01`.
 
 ---
 
@@ -182,8 +182,8 @@ collector.close()
   ↓
 [ASSEMBLE] → Pipeline.assemble_context()
   ├─ 预算约束
-  ├─ 去重（未实现，TODO）
-  └─ 冲突解决（未实现，TODO）
+  ├─ 近重复去重
+  └─ 冲突/过期/替代版本过滤
   ↓
 [INJECT] → 注入模型上下文
   ↓
@@ -214,13 +214,10 @@ collector.close()
 
 ## 待实现模块
 
-### P0（关键缺失）
+- [x] **RETRIEVE** — SQLite FTS/子串候选召回与硬过滤
+- [x] **ROUTE** — 确定性路径与慢回退信号
+- [x] **CONFLICT** — 保守冲突建议与 API
 
-- [ ] **RETRIEVE** — 多路召回（分类树 + 快速索引 + 慢速索引）
-- [ ] **ROUTE** — 查询路由（确定 scope / path / destination）
-- [ ] **真实 Trace 评估** — 在真实 agent 会话中验证
-- [ ] **Context 去重** — 检测冗余记忆
-- [ ] **Conflict 解决** — 处理矛盾记忆
 
 ### P1（增强）
 
