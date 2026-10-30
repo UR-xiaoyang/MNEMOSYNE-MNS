@@ -22,6 +22,7 @@ from memory_schema import memory_from_api
 from memory_store import MemoryStore
 from shadow_mode import ShadowModeCollector
 from citation_detection import detect_citations_in_response
+from write_gate import proposal_payload
 
 app = FastAPI(
     title="MNEMOSYNE-MNS",
@@ -83,6 +84,11 @@ class MemorySupersedeRequest(BaseModel):
     content: str
     scope_level: str = Field(default="global", pattern="^(session|project|global)$")
     destination: str = Field(default="local")
+
+
+class WriteProposalRequest(BaseModel):
+    text: str
+    scope_level: str = Field(default="session", pattern="^(session|project|global)$")
 
 
 class CitationRequest(BaseModel):
@@ -207,6 +213,12 @@ async def retrieve_store(req: RetrievalRequest):
     )
 
 
+@app.post("/write_proposals")
+async def write_proposals(req: WriteProposalRequest):
+    """Return write suggestions; this endpoint never commits them."""
+    return {"proposals": proposal_payload(req.text, scope_level=req.scope_level)}
+
+
 @app.post("/detect_citations", response_model=CitationResponse)
 async def detect_citations(req: CitationRequest):
     """
@@ -257,6 +269,7 @@ def root():
             "memories": "/memories",
             "memories_supersede": "/memories/supersede",
             "retrieve_store": "/retrieve_store",
+            "write_proposals": "/write_proposals",
             "detect_citations": "/detect_citations",
             "models": "/models",
             "docs": "/docs"
