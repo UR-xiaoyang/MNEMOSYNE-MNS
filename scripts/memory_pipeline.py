@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from memory_schema import MemoryEntity, Query, Scope, extract_native_features
 from rank_inference import RankingBaseline, resolve_model_path
 from structured_features import build_structured_features
+from context_assembly import assemble_context as budgeted_assemble_context
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -195,24 +196,11 @@ class MemoryPipeline:
         Returns:
             List of memories to inject, with injected=True
         """
-        budget = max_tokens
-        assembled = []
-        
-        for result in ranked_results:
-            if budget <= 0:
-                break
-            
-            # Simple token estimation (TODO: use actual tokenizer)
-            estimated_tokens = tokens_per_memory
-            
-            if estimated_tokens <= budget:
-                result["injected"] = True
-                assembled.append(result)
-                budget -= estimated_tokens
-            else:
-                result["injected"] = False
-        
-        return assembled
+        return budgeted_assemble_context(
+            ranked_results,
+            max_tokens=max_tokens,
+            tokens_per_memory=tokens_per_memory,
+        )
 
 
 def create_pipeline(model_name: str = "hybrid") -> MemoryPipeline:
