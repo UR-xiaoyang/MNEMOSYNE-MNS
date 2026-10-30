@@ -23,6 +23,7 @@ from memory_store import MemoryStore
 from shadow_mode import ShadowModeCollector
 from shadow_runtime import record_retrieval
 from citation_detection import detect_citations_in_response
+from route_baseline import route_query
 from write_gate import proposal_payload
 app = FastAPI(
     title="MNEMOSYNE-MNS",
@@ -203,6 +204,7 @@ async def supersede_memory(req: MemorySupersedeRequest):
 
 @app.post("/retrieve_store", response_model=RetrievalResponse)
 async def retrieve_store(req: RetrievalRequest):
+    decision = route_query(req.query)
     candidates = memory_store.search_candidates(
         req.query,
         scope_level=req.scope_level,
@@ -218,6 +220,8 @@ async def retrieve_store(req: RetrievalRequest):
         candidate_memories=candidates,
         scope_level=req.scope_level,
         destination=req.destination,
+        path_hint=decision.primary_path,
+        requires_high_authority=decision.requires_high_authority,
         top_k=req.top_k,
     )
     assembled = pipeline.assemble_context(ranked, max_tokens=4000)
@@ -225,6 +229,20 @@ async def retrieve_store(req: RetrievalRequest):
         results=assembled,
         latency_ms=round((time.time() - start) * 1000, 2),
     )
+
+
+@app.post("/route")
+async def route(req: WriteProposalRequest):
+    decision = route_query(req.text)
+    return {
+        "primary_path": decision.primary_path,
+        "candidate_paths": decision.candidate_paths,
+        "confidence_proxy": decision.confidence_proxy,
+        "force_slow_fallback": decision.force_slow_fallback,
+        "fallback_reason": decision.fallback_reason,
+        "query_kind": decision.query_kind,
+        "requires_high_authority": decision.requires_high_authority,
+    }
 
 
 @app.post("/write_proposals")
@@ -283,6 +301,7 @@ def root():
             "memories": "/memories",
             "memories_supersede": "/memories/supersede",
             "retrieve_store": "/retrieve_store",
+            "route": "/route",
             "write_proposals": "/write_proposals",
             "detect_citations": "/detect_citations",
             "models": "/models",
