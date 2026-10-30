@@ -20,6 +20,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 from memory_pipeline import create_pipeline
 from memory_schema import memory_from_api
 from memory_store import MemoryStore
+from memory_service import MemoryService
 from shadow_mode import ShadowModeCollector
 from shadow_runtime import record_retrieval
 from citation_detection import detect_citations_in_response
@@ -51,6 +52,7 @@ shadow_enabled = os.environ.get("MNEMOSYNE_SHADOW_MODE", "0") == "1"
 if shadow_enabled:
     shadow_collector = ShadowModeCollector(os.environ.get("MNEMOSYNE_SHADOW_DB", str(PROJECT_ROOT / "shadow_traces.db")))
 memory_store = MemoryStore(os.environ.get("MNEMOSYNE_DB", str(PROJECT_ROOT / "memory.db")))
+memory_service = MemoryService(pipeline, memory_store)
 
 
 class Memory(BaseModel):
@@ -185,19 +187,25 @@ async def retrieve(req: RetrievalRequest):
 
 @app.post("/memories", response_model=MemoryWriteResponse)
 async def write_memory(req: MemoryWriteRequest):
-    memory = memory_from_api(req.id, req.content, destination=req.destination, scope_level=req.scope_level)
-    existing = memory_store.get(req.id)
-    if existing is not None:
-        memory.version = existing.version + 1
-    memory_store.upsert(memory)
+    memory = memory_service.write(
+        req.id,
+        req.content,
+        scope_level=req.scope_level,
+        destination=req.destination,
+    )
     return MemoryWriteResponse(memory_id=memory.memory_id, version=memory.version)
 
 
 @app.post("/memories/supersede", response_model=MemoryWriteResponse)
 async def supersede_memory(req: MemorySupersedeRequest):
-    replacement = memory_from_api(req.new_id, req.content, destination=req.destination, scope_level=req.scope_level)
     try:
-        updated = memory_store.supersede(req.old_id, replacement)
+        updated = memory_service.supersede(
+            req.old_id,
+            req.new_id,
+            req.content,
+            scope_level=req.scope_level,
+            destination=req.destination,
+        )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return MemoryWriteResponse(memory_id=updated.memory_id, version=updated.version)
@@ -205,29 +213,16 @@ async def supersede_memory(req: MemorySupersedeRequest):
 
 @app.post("/retrieve_store", response_model=RetrievalResponse)
 async def retrieve_store(req: RetrievalRequest):
-    decision = route_query(req.query)
-    candidates = memory_store.search_candidates(
+    import time
+    start = time.time()
+    outcome = memory_service.retrieve_store(
         req.query,
         scope_level=req.scope_level,
         destination=req.destination,
-        limit=max(req.top_k * 10, 100),
-    )
-    if not candidates:
-        return RetrievalResponse(results=[], latency_ms=0.0)
-    import time
-    start = time.time()
-    ranked = pipeline.retrieve_and_rank(
-        query_text=req.query,
-        candidate_memories=candidates,
-        scope_level=req.scope_level,
-        destination=req.destination,
-        path_hint=decision.primary_path,
-        requires_high_authority=decision.requires_high_authority,
         top_k=req.top_k,
     )
-    assembled = pipeline.assemble_context(ranked, max_tokens=4000)
     return RetrievalResponse(
-        results=assembled,
+        results=outcome["assembled"],
         latency_ms=round((time.time() - start) * 1000, 2),
     )
 
