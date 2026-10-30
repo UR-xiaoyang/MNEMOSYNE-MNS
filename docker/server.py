@@ -24,6 +24,7 @@ from shadow_mode import ShadowModeCollector
 from shadow_runtime import record_retrieval
 from citation_detection import detect_citations_in_response
 from route_baseline import route_query
+from conflict_detection import find_conflicts
 from write_gate import proposal_payload
 app = FastAPI(
     title="MNEMOSYNE-MNS",
@@ -231,6 +232,20 @@ async def retrieve_store(req: RetrievalRequest):
     )
 
 
+@app.post("/conflicts")
+async def conflicts(req: RetrievalRequest):
+    memories = [
+        memory_from_api(item.id, item.content, destination=req.destination, scope_level=req.scope_level)
+        for item in req.memories
+    ]
+    return {
+        "conflicts": [
+            {"left_id": item.left_id, "right_id": item.right_id, "reason": item.reason, "confidence": item.confidence}
+            for item in find_conflicts(memories)
+        ]
+    }
+
+
 @app.post("/route")
 async def route(req: WriteProposalRequest):
     decision = route_query(req.text)
@@ -302,6 +317,7 @@ def root():
             "memories_supersede": "/memories/supersede",
             "retrieve_store": "/retrieve_store",
             "route": "/route",
+            "conflicts": "/conflicts",
             "write_proposals": "/write_proposals",
             "detect_citations": "/detect_citations",
             "models": "/models",
