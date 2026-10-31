@@ -67,7 +67,7 @@ python3 -m unittest discover -s tests -v
 python3 -m py_compile scripts/*.py docker/server.py
 ```
 
-The repository currently has a 5-test runtime/deployment contract suite. Docker image building requires a Docker daemon; C++ ONNX compilation requires ONNX Runtime headers/libs and is a separate gate.
+The repository currently has runtime, deployment, memory-store, Shadow Mode and Hermes adapter contract tests. Docker image building requires a Docker daemon; C++ ONNX compilation requires ONNX Runtime headers/libs and is a separate gate.
 
 ## C++ status
 

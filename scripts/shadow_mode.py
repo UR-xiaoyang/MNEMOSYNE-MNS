@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 import time
 import uuid
 from dataclasses import asdict, dataclass
@@ -76,7 +77,7 @@ class ShadowModeCollector:
         self.db_path = Path(db_path).expanduser()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
-        self._write_lock = __import__("threading").RLock()
+        self._write_lock = threading.RLock()
         self._init_schema()
     
     def _init_schema(self) -> None:
@@ -139,6 +140,11 @@ class ShadowModeCollector:
         """)
         self.conn.commit()
     
+    def _execute_write(self, sql: str, params: tuple[Any, ...]) -> None:
+        with self._write_lock:
+            self.conn.execute(sql, params)
+            self.conn.commit()
+
     def log_retrieval(
         self,
         session_id: str,
@@ -159,7 +165,7 @@ class ShadowModeCollector:
             metadata_json=metadata,
         )
         
-        self.conn.execute(
+        self._execute_write(
             """
             INSERT INTO retrieval_events 
             (event_id, timestamp, session_id, turn_id, query_text, query_json, candidates_json, metadata_json)
@@ -176,7 +182,6 @@ class ShadowModeCollector:
                 json.dumps(event.metadata_json, ensure_ascii=False),
             ),
         )
-        self.conn.commit()
         return event
     
     def log_citation(
@@ -202,7 +207,7 @@ class ShadowModeCollector:
             original_rank=original_rank or 0,
         )
         
-        self.conn.execute(
+        self._execute_write(
             """
             INSERT INTO citation_events
             (event_id, timestamp, session_id, turn_id, retrieval_event_id, memory_id, citation_json, context_position, original_rank)
@@ -220,7 +225,6 @@ class ShadowModeCollector:
                 event.original_rank,
             ),
         )
-        self.conn.commit()
         return event
     
     def log_correction(
@@ -244,7 +248,7 @@ class ShadowModeCollector:
             feedback_json=feedback,
         )
         
-        self.conn.execute(
+        self._execute_write(
             """
             INSERT INTO correction_events
             (event_id, timestamp, session_id, turn_id, citation_event_id, memory_id, correction_type, feedback_json)
@@ -261,7 +265,6 @@ class ShadowModeCollector:
                 json.dumps(event.feedback_json, ensure_ascii=False),
             ),
         )
-        self.conn.commit()
         return event
     
     def log_ignored(
@@ -285,7 +288,7 @@ class ShadowModeCollector:
             injected=injected,
         )
         
-        self.conn.execute(
+        self._execute_write(
             """
             INSERT INTO ignored_events
             (event_id, timestamp, session_id, turn_id, retrieval_event_id, memory_id, rank, injected)
@@ -302,7 +305,6 @@ class ShadowModeCollector:
                 event.injected,
             ),
         )
-        self.conn.commit()
         return event
     
     def get_session_traces(self, session_id: str) -> dict[str, Any]:
@@ -344,12 +346,18 @@ class ShadowModeCollector:
         where_clause = "WHERE session_id = ?" if session_id else ""
         params = (session_id,) if session_id else ()
         
-        # Citation rate
-        injected_count = cursor.execute(
-            f"SELECT COUNT(*) FROM retrieval_events {where_clause}",
+        # Citation rate is measured against injected memories, not retrieval events.
+        injected_rows = cursor.execute(
+            f"SELECT candidates_json FROM retrieval_events {where_clause}",
             params,
-        ).fetchone()[0]
-        
+        ).fetchall()
+        injected_count = sum(
+            1
+            for (candidates_json,) in injected_rows
+            for candidate in json.loads(candidates_json)
+            if candidate.get("injected", False)
+        )
+
         cited_count = cursor.execute(
             f"SELECT COUNT(*) FROM citation_events {where_clause}",
             params,

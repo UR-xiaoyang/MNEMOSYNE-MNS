@@ -25,6 +25,22 @@ class ShadowRuntimeTest(unittest.TestCase):
             self.assertEqual(collector.compute_metrics("s1")["injected_count"], 1)
             collector.close()
 
+    def test_metrics_count_injected_candidates_not_retrieval_events(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            collector = ShadowModeCollector(Path(tmp) / "trace.db")
+            collector.log_retrieval(
+                session_id="s1",
+                turn_id="t1",
+                query={"text": "proxy"},
+                candidates=[
+                    {"memory_id": "m1", "injected": True},
+                    {"memory_id": "m2", "injected": False},
+                ],
+                metadata={},
+            )
+            self.assertEqual(collector.compute_metrics("s1")["injected_count"], 1)
+            collector.close()
+
     def test_citation_and_correction_are_recorded_when_enabled(self):
         with tempfile.TemporaryDirectory() as tmp:
             collector = ShadowModeCollector(Path(tmp) / "trace.db")

@@ -163,6 +163,10 @@ if user_corrected:
 collector.close()
 ```
 
+### Hermes Agent turn adapter
+
+The explicit Python adapter is documented in [docs/HERMES-INTEGRATION.md](HERMES-INTEGRATION.md). It exposes `before_turn()`, `after_turn()`, and `record_correction()` without automatically committing resident memory. Shadow tracing remains opt-in.
+
 ### Shadow Mode HTTP endpoints
 
 Set `MNEMOSYNE_SHADOW_MODE=1` to enable local trace writes. It is disabled by default.

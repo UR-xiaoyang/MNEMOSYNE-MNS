@@ -21,14 +21,24 @@ class FakePipeline:
                 "content": memory.content,
                 "rank": index + 1,
                 "score": 1.0 / (index + 1),
+                "token_cost": 3,
                 "injected": True,
                 "metadata": {"validity_state": memory.validity.state, "conflict_with": []},
             }
             for index, memory in enumerate(candidate_memories)
         ]
 
+    last_assembly_kwargs = {}
+
     def assemble_context(self, ranked, **kwargs):
-        return ranked[:1]
+        self.last_assembly_kwargs = kwargs
+        selected = ranked[:1]
+        for item in selected:
+            item["assembly_token_cost"] = item.get(
+                "token_cost",
+                kwargs.get("tokens_per_memory", 200),
+            )
+        return selected
 
 
 class MemoryServiceTest(unittest.TestCase):
@@ -46,6 +56,23 @@ class MemoryServiceTest(unittest.TestCase):
             proposals = service.propose_write("请记住：我偏好使用中文回复。", scope_level="project")
             self.assertTrue(proposals[0]["admissible"])
             self.assertIsNone(store.get("请记住：我偏好使用中文回复。"))
+            store.close()
+
+    def test_retrieve_store_accepts_context_budget(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = MemoryStore(Path(tmp) / "memory.db")
+            pipeline = FakePipeline()
+            service = MemoryService(pipeline, store)
+            service.write("m1", "配置代理服务器", scope_level="global", destination="local")
+            outcome = service.retrieve_store(
+                "代理",
+                scope_level="global",
+                destination="local",
+                top_k=5,
+                max_tokens=17,
+                tokens_per_memory=3,
+            )
+            self.assertEqual(outcome["assembled"][0]["assembly_token_cost"], 3)
             store.close()
 
     def test_supersede_is_exposed_through_service(self):

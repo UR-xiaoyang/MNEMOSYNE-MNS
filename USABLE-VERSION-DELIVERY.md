@@ -221,10 +221,10 @@ collector.close()
 
 ### P1（增强）
 
-- [ ] **WRITE** — 从对话中提取记忆
-- [ ] **UPDATE** — 记忆更新与版本管理
+- [x] **WRITE** — 保守 proposal 提取与显式提交 API
+- [x] **UPDATE** — supersede 版本更新 API
 - [ ] **AUDIT** — 后台审计与质量监控
-- [ ] **EGRESS** — 出口策略与敏感信息控制
+- [x] **EGRESS** — scope/destination 硬过滤与 CORS 默认白名单
 
 ### P2（优化）
 

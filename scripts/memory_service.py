@@ -31,7 +31,16 @@ class MemoryService:
     def propose_write(self, text: str, *, scope_level: str) -> list[dict]:
         return proposal_payload(text, scope_level=scope_level)
 
-    def retrieve_store(self, query: str, *, scope_level: str, destination: str, top_k: int = 10) -> dict:
+    def retrieve_store(
+        self,
+        query: str,
+        *,
+        scope_level: str,
+        destination: str,
+        top_k: int = 10,
+        max_tokens: int = 4000,
+        tokens_per_memory: int = 200,
+    ) -> dict:
         decision: RouteDecision = route_query(query)
         candidates = self.store.search_candidates(
             query,
@@ -51,5 +60,9 @@ class MemoryService:
         return {
             "decision": decision,
             "ranked": ranked,
-            "assembled": assemble_context(ranked, max_tokens=4000),
+            "assembled": assemble_context(
+                ranked,
+                max_tokens=max_tokens,
+                tokens_per_memory=tokens_per_memory,
+            ),
         }

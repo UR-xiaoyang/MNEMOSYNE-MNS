@@ -87,6 +87,7 @@ for memory in assembled:
 ```
 
 完整 API 文档：[docs/API-USAGE.md](docs/API-USAGE.md)
+Hermes 适配器文档：[docs/HERMES-INTEGRATION.md](docs/HERMES-INTEGRATION.md)
 
 ### 持久化记忆 API
 
