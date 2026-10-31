@@ -165,7 +165,7 @@ collector.close()
 
 ### Hermes Agent turn adapter
 
-The explicit Python adapter is documented in [docs/HERMES-INTEGRATION.md](HERMES-INTEGRATION.md). It exposes `before_turn()`, `after_turn()`, and `record_correction()` without automatically committing resident memory. Shadow tracing remains opt-in.
+The explicit Python adapter is documented in [docs/HERMES-INTEGRATION.md](HERMES-INTEGRATION.md). The standalone Hermes `MemoryProvider` plugin lives under `plugins/memory/mnemosyne/` and exposes prefetch, Shadow citation logging and proposal-only writes without automatically committing resident memory.
 
 ### Shadow Mode HTTP endpoints
 

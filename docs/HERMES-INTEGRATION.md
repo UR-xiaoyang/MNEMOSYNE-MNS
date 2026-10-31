@@ -76,6 +76,12 @@ if user_corrected_memory_id:
 - Long-term memory changes still require an explicit `MemoryService.write()` or `MemoryService.supersede()` call.
 - Shadow Mode is disabled by default and stores data locally in SQLite.
 
-## Current boundary
+## Hermes plugin provider
 
-This adapter supplies a stable host-side contract; it is not yet a bundled Hermes plugin or automatic gateway hook. A future plugin can call the same lifecycle methods from Hermes' turn middleware without changing the ranking, persistence, or trace code.
+For native Hermes lifecycle integration, copy `plugins/memory/mnemosyne/` into Hermes' user plugin memory directory. It implements the `MemoryProvider` contract and calls the HTTP API:
+
+```text
+~/.hermes/plugins/memory/mnemosyne/
+```
+
+Configure `MNEMOSYNE_API_URL` (default `http://127.0.0.1:8000`) and optionally `MNEMOSYNE_API_KEY`. The plugin keeps Shadow citation logging opt-in through `MNEMOSYNE_SHADOW_MODE=1`.

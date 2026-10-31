@@ -242,9 +242,24 @@ async def retrieve_store(req: RetrievalRequest):
         destination=req.destination,
         top_k=req.top_k,
     )
+    assembled = outcome["assembled"]
+    retrieval_event_id = record_retrieval(
+        shadow_collector,
+        enabled=shadow_enabled and req.session_id is not None and req.turn_id is not None,
+        session_id=req.session_id or "",
+        turn_id=req.turn_id or "",
+        query={"text": req.query, "scope": {"level": req.scope_level}, "destination": req.destination},
+        candidates=outcome["ranked"],
+        metadata={
+            "ranker_model_id": memory_service.pipeline.ranker.model_id,
+            "injected_count": len(assembled),
+            "route_path": outcome["decision"].primary_path,
+        },
+    )
     return RetrievalResponse(
-        results=outcome["assembled"],
+        results=assembled,
         latency_ms=round((time.time() - start) * 1000, 2),
+        retrieval_event_id=retrieval_event_id,
     )
 
 
