@@ -8,39 +8,50 @@
 
 ## Training Results
 
-### Metrics
+### Metrics (After Hard Negative Mining)
 
 | Metric | Baseline | Enhanced | Improvement |
 |--------|----------|----------|-------------|
-| **Train NDCG@10** | 0.5796 | 0.9592 | +0.3796 (+65%) |
-| **Val NDCG@10** | 0.5796 | **0.9985** | **+0.4189 (+72%)** |
-| **NDCG@5** | N/A | 0.9982 | N/A |
+| **Train NDCG@10** | 0.5796 | 0.9405 | +0.3609 (+62%) |
+| **Val NDCG@10** | 0.5796 | **0.8057** | **+0.2261 (+39%)** |
+| **NDCG@5** | N/A | 0.7827 | N/A |
 
 ### Performance
 
-- **Training Time**: 36.7 minutes
-- **Training Samples**: 100,726 (with negative sampling)
+- **Training Time**: 36.3 minutes
+- **Training Samples**: 100,726 (with hard negative sampling)
 - **Validation Samples**: 28,779
 - **Offline Gate**: ✅ **PASSED** (Target: > 0.5796)
 
+### Negative Sampling Strategy
+
+**Initial (Random Sampling)**: Val NDCG@10 = 0.9985 ❌ **Unrealistically high**
+- Problem: Negative samples were completely unrelated to queries
+- Model learned trivial "relevant vs irrelevant" distinction
+
+**Improved (Hard Negative Mining with BM25)**: Val NDCG@10 = 0.8057 ✅ **Realistic**
+- Method: Sample top-k BM25-similar but incorrect memories
+- Result: Model learns fine-grained ranking among plausible candidates
+- Train/Val gap: 13.5% (healthy generalization)
+
 ---
 
-## Feature Importance (Top 10)
+## Feature Importance (Top 10, After Hard Negative Mining)
 
-| Rank | Feature | Importance | Type |
-|------|---------|------------|------|
-| 1 | e5_cosine | 45,068.2 | Semantic |
-| 2 | memory_len_log | 8,750.2 | Basic |
-| 3 | query_len_log | 4,509.1 | Basic |
-| 4 | lexical_containment | 2,890.5 | Lexical |
-| 5 | lexical_jaccard | 1,554.5 | Lexical |
-| 6 | memory_has_negation | 779.3 | Linguistic |
-| 7 | memory_has_update | 137.0 | Linguistic |
-| 8 | version_consistency | 42.7 | **Enhanced (New)** |
-| 9 | query_has_negation | 22.3 | Linguistic |
-| 10 | query_has_reference | 0.9 | Linguistic |
+| Rank | Feature | Importance | Type | Change vs Random |
+|------|---------|------------|------|------------------|
+| 1 | lexical_containment | 29,203.5 | Lexical | ⬆️ +909% (was 4th) |
+| 2 | lexical_jaccard | 12,708.6 | Lexical | ⬆️ +717% (was 5th) |
+| 3 | e5_cosine | 11,291.7 | Semantic | ⬇️ -75% (was 1st) |
+| 4 | memory_len_log | 10,698.0 | Basic | ⬆️ +22% (was 2nd) |
+| 5 | query_len_log | 7,003.7 | Basic | ⬆️ +55% (was 3rd) |
+| 6 | memory_has_negation | 269.6 | Linguistic | ⬇️ -65% (was 6th) |
+| 7 | memory_has_update | 222.4 | Linguistic | ⬆️ +62% (was 7th) |
+| 8 | query_has_negation | 184.6 | Linguistic | ⬆️ +726% (was 9th) |
+| 9 | version_consistency | 170.0 | **Enhanced (New)** | ⬆️ +298% (was 8th) |
+| 10 | query_has_reference | 26.0 | Linguistic | ⬆️ +2,823% (was 10th) |
 
-**Note**: Enhanced features (8-14 dimensional system-native) contributed to model learning. Version consistency (rank 8) is the most impactful new feature.
+**Key Insight**: Hard negatives shifted model from **semantic dominance** (e5_cosine 63% share) to **multi-feature collaboration** (lexical + semantic + linguistic). The model now performs fine-grained ranking instead of trivial relevance detection.
 
 ---
 
@@ -76,14 +87,16 @@ Original data integration (t_e6d7c59c) had a critical flaw:
   - Label mapping: Support `"citation"`, `"correction"`, `"unknown"`
   - E5 model path: Local `deploy/e5_model`
 
-### 2. `scripts/build_ranking_dataset.py`
-- **Purpose**: Rebuild data with negative sampling for ranking
-- **Method**: 1 positive + 4 random negatives per query
-- **Output**: 143,895 samples with proper ranking structure
+### 2. `scripts/build_hard_negative_dataset.py` (NEW)
+- **Purpose**: Rebuild data with **hard negative mining** using BM25
+- **Method**: For each positive pair, sample top-k BM25-similar but incorrect memories
+- **Output**: 143,895 samples with challenging negatives (not random)
+- **Impact**: Val NDCG@10 from 0.9985 (unrealistic) → 0.8057 (realistic)
 
-### 3. `scripts/rebuild_validation_set.py`
-- **Purpose**: Initial attempt (deprecated by build_ranking_dataset.py)
-- **Issue**: Split by query_id, didn't add negative sampling
+### 3. `scripts/build_ranking_dataset.py` (DEPRECATED)
+- **Purpose**: Initial attempt with random negative sampling
+- **Issue**: Negatives were too easy (completely unrelated to queries)
+- **Superseded by**: `build_hard_negative_dataset.py`
 
 ### 4. `scripts/monitor_remote_training.sh`
 - **Purpose**: Remote training progress monitoring

@@ -2,7 +2,7 @@
 # 远程训练进度监控脚本
 
 REMOTE_HOST="jx@172.29.2.51"
-LOG_FILE="~/logs/rank_with_negatives.log"
+LOG_FILE="~/logs/rank_hard_negatives.log"
 CHECK_INTERVAL=30  # 每30秒检查一次
 
 echo "=== MNEMOSYNE RANK 训练监控 ==="
