@@ -91,6 +91,21 @@ class RankingBaseline:
             self.tree_model = artifact["model"]
             self.feature_names = artifact["feature_names"]
             
+        elif self.model_id == "MNEMOSYNE-MNS-RANK-ENHANCED-V2":
+            # Enhanced V2 with LightGBM LambdaMART and hard negative mining
+            artifact_path = self.model_path / "enhanced_ranker.joblib"
+            if not artifact_path.exists():
+                raise FileNotFoundError(f"Enhanced ranker not found: {artifact_path}")
+            # joblib.load reads locally trained model artifacts, not untrusted external data
+            artifact = joblib.load(artifact_path)
+            self.ranker = artifact  # LightGBM Booster object
+            self.encoder_name = self.metadata.get("encoder", "intfloat/multilingual-e5-small")
+            self.encoder_name = os.environ.get("MNEMOSYNE_E5_MODEL", self.encoder_name)
+            offline = os.environ.get("HF_HUB_OFFLINE") == "1"
+            self.tokenizer = self.auto_tokenizer.from_pretrained(self.encoder_name, local_files_only=offline)
+            self.encoder = self.auto_model.from_pretrained(self.encoder_name, local_files_only=offline).to(self.device)
+            self.encoder.eval()
+            
         else:
             raise ValueError(f"Unknown model_id: {self.model_id}")
     
@@ -145,6 +160,24 @@ class RankingBaseline:
                 raise ValueError("Tree model requires extra_features")
             expanded = np.concatenate([extra_features, np.abs(extra_features), extra_features * extra_features], axis=1)
             return self.tree_model.predict_proba(self.scaler.transform(expanded))[:, 1]
+        
+        elif self.model_id == "MNEMOSYNE-MNS-RANK-ENHANCED-V2":
+            # Import feature extractor
+            try:
+                from rank_enhanced_features import extract_enhanced_features
+            except ModuleNotFoundError:
+                from .rank_enhanced_features import extract_enhanced_features
+            
+            # Encode with E5
+            query_emb = self.encode_text(queries, "query: ")
+            memory_emb = self.encode_text(memories, "passage: ")
+            e5_cosine = np.sum(query_emb * memory_emb, axis=1, keepdims=True)
+            
+            # Extract 23-dimensional features
+            features = extract_enhanced_features(queries, memories, e5_cosine)
+            
+            # LightGBM inference
+            return self.ranker.predict(features)
         
         else:
             raise ValueError(f"Unsupported model_id: {self.model_id}")
