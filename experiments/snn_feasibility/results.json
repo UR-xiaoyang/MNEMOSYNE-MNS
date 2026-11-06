@@ -1,0 +1,18 @@
+{
+  "experiment": "SNN_feasibility_L1_layer",
+  "dataset_size": 1000,
+  "vocab_size": 5000,
+  "test_queries": 100,
+  "test_memories": 100,
+  "tfidf_latency_ms": {
+    "mean": 0.8872675895690918,
+    "std": 0.6672571678305067
+  },
+  "snn_available": true,
+  "snn_latency_ms": {
+    "mean": 1546.8797850608826,
+    "std": 87.88440469045239
+  },
+  "speedup": 0.0005735853542970506,
+  "conclusion": "TF-IDF faster"
+}
