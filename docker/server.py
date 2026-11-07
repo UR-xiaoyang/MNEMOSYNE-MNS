@@ -210,8 +210,9 @@ def health():
     """Health check endpoint."""
     return {
         "status": "ok",
-        "model": "RANK-HYBRID-01",
-        "version": "1.0.0"
+        "model": pipeline.ranker.model_id if hasattr(pipeline, 'ranker') else "UNKNOWN",
+        "version": "1.0.0",
+        "ranker_version": ranker_version
     }
 
 
