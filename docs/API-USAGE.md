@@ -63,6 +63,11 @@ curl -X POST http://localhost:8000/memories \
   -H 'Content-Type: application/json' \
   -d '{"id":"m-1","content":"配置代理服务器","scope_level":"global","destination":"local"}'
 
+# Project-scoped memory must carry its workspace identity
+curl -X POST http://localhost:8000/memories \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"project-proxy","content":"项目代理配置","scope_level":"project","project_id":"/workspace/my-project","destination":"local"}'
+
 # Search the store, then rank the visible candidates
 curl -X POST http://localhost:8000/retrieve_store \
   -H 'Content-Type: application/json' \
@@ -70,6 +75,37 @@ curl -X POST http://localhost:8000/retrieve_store \
 ```
 
 `MemoryStore` applies scope, egress, superseded/deprecated and strict-conflict filters before ranking. In Docker, mount `/app/data` so `memory.db` survives container replacement.
+
+### Session working context
+
+Hermes' MNEMOSYNE provider records each completed turn as session-scoped working context. The write is idempotent per `(session_id, turn_id)` and does **not** create a project/global memory:
+
+```bash
+curl -X POST http://localhost:8000/context/turn \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "session_id":"session-123",
+    "turn_id":"turn-4",
+    "project_id":"/workspace/my-project",
+    "user_text":"Use SQLite for this task.",
+    "assistant_text":"I will use SQLite for the local store."
+  }'
+```
+
+Pass the same `session_id` and `project_id` to `/retrieve_store` with `scope_level: "session"`. It can retrieve matching session, project and global entities, but never session context from a different session or project context from a different workspace.
+
+For the Hermes compression boundary, create a bounded idempotent checkpoint:
+
+```bash
+curl -X POST http://localhost:8000/context/checkpoint \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "session_id":"session-123",
+    "turn_id":"turn-4",
+    "project_id":"/workspace/my-project",
+    "transcript":"user: Use SQLite for this task.\nassistant: Confirmed."
+  }'
+```
 
 ### ROUTE / WRITE / UPDATE
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal, cast
 
 from context_assembly import assemble_context
 from memory_schema import memory_from_api
@@ -16,16 +16,58 @@ class MemoryService:
         self.pipeline = pipeline
         self.store = store
 
-    def write(self, memory_id: str, content: str, *, scope_level: str, destination: str):
-        memory = memory_from_api(memory_id, content, scope_level=scope_level, destination=destination)
+    @staticmethod
+    def _validate_scope_identity(scope_level: str, session_id: str | None, project_id: str | None) -> None:
+        if scope_level == "session" and not session_id:
+            raise ValueError("session_id is required for session-scoped memory")
+        if scope_level == "project" and not project_id:
+            raise ValueError("project_id is required for project-scoped memory")
+
+    def write(
+        self,
+        memory_id: str,
+        content: str,
+        *,
+        scope_level: str,
+        destination: str,
+        session_id: str | None = None,
+        project_id: str | None = None,
+    ):
+        self._validate_scope_identity(scope_level, session_id, project_id)
+        memory = memory_from_api(
+            memory_id,
+            content,
+            scope_level=cast(Literal["session", "project", "global"], scope_level),
+            destination=destination,
+            session_id=session_id,
+            project_id=project_id,
+        )
         existing = self.store.get(memory_id)
         if existing is not None:
             memory.version = existing.version + 1
         self.store.upsert(memory)
         return memory
 
-    def supersede(self, old_id: str, new_id: str, content: str, *, scope_level: str, destination: str):
-        replacement = memory_from_api(new_id, content, scope_level=scope_level, destination=destination)
+    def supersede(
+        self,
+        old_id: str,
+        new_id: str,
+        content: str,
+        *,
+        scope_level: str,
+        destination: str,
+        session_id: str | None = None,
+        project_id: str | None = None,
+    ):
+        self._validate_scope_identity(scope_level, session_id, project_id)
+        replacement = memory_from_api(
+            new_id,
+            content,
+            scope_level=cast(Literal["session", "project", "global"], scope_level),
+            destination=destination,
+            session_id=session_id,
+            project_id=project_id,
+        )
         return self.store.supersede(old_id, replacement)
 
     def propose_write(self, text: str, *, scope_level: str) -> list[dict]:
@@ -40,22 +82,28 @@ class MemoryService:
         top_k: int = 10,
         max_tokens: int = 4000,
         tokens_per_memory: int = 200,
+        session_id: str | None = None,
+        project_id: str | None = None,
     ) -> dict:
         decision: RouteDecision = route_query(query)
         candidates = self.store.search_candidates(
             query,
-            scope_level=scope_level,
+            scope_level=cast(Literal["session", "project", "global"], scope_level),
             destination=destination,
             limit=max(top_k * 10, 100),
+            session_id=session_id,
+            project_id=project_id,
         )
         ranked = self.pipeline.retrieve_and_rank(
             query_text=query,
             candidate_memories=candidates,
-            scope_level=scope_level,
+            scope_level=cast(Literal["session", "project", "global"], scope_level),
             destination=destination,
             path_hint=decision.primary_path,
             requires_high_authority=decision.requires_high_authority,
             top_k=top_k,
+            session_id=session_id,
+            project_id=project_id,
         ) if candidates else []
         return {
             "decision": decision,

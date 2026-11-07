@@ -46,20 +46,22 @@ EGRESS      本地/云端投递策略
 
 ## 当前状态
 
-**✓ 可用版本已交付（Production-Ready API）**
+**✓ V2 增强版已部署（Production-Ready）**
 
-RANK 专家的完整 API 已实现并可用于生产环境集成。
+RANK Enhanced V2 已完成生产部署，相比基线版本NDCG@10提升39%。
 
 ### 核心功能
 
 - ✅ **端到端检索 Pipeline** — 硬过滤 → 语义+结构化+原生特征 → Ranking → 预算装配
-- ✅ **训练好的 Ranker** — Hybrid 模型（NDCG@10 = 0.5796）
+- ✅ **RANK Enhanced V2** — 23维特征 + 硬负样本挖掘（**NDCG@10 = 0.8057, +39%**）
+- ✅ **训练好的 Ranker** — Hybrid基线（NDCG@10 = 0.5796）作为回退选项
 - ✅ **Shadow Mode** — 本地 trace 收集与生产指标计算
 - ✅ **Citation 检测** — 启发式引用检测
 - ✅ **RETRIEVE 基础层** — SQLite 记忆存储、FTS/子串召回、scope/egress/validity 过滤
 - ✅ **记忆写入 API** — `/memories` 持久化写入，`/retrieve_store` 从本地库召回并排序
 - ✅ **模型 bundle** — TF-IDF vectorizer、ranker、E5 目录可离线打包
 - ✅ **Context Assembly** — token budget、近重复去重、conflicted/superseded 过滤和冲突链排除
+- ✅ **Session Working Context** — 每轮对话写入 session scope，并在下一轮按 session/project/global 层级召回；不会自动升级为长期记忆
 - ✅ **ROUTE baseline** — 分类路径、authority 需求、低置信度慢回退信号
 - ✅ **Hermes MemoryProvider** — 独立 plugin provider，支持 prefetch、Shadow citation 和 proposal-only WRITE
 
@@ -68,8 +70,11 @@ RANK 专家的完整 API 已实现并可用于生产环境集成。
 ```python
 from memory_pipeline import create_pipeline
 
-# 创建 pipeline
-pipeline = create_pipeline("hybrid")
+# 创建 V2 增强版 pipeline (推荐)
+pipeline = create_pipeline("v2")
+
+# 或使用基线版本
+# pipeline = create_pipeline("hybrid")
 
 # 检索并排序
 results = pipeline.retrieve_and_rank(
@@ -87,16 +92,23 @@ for memory in assembled:
     print(f"Rank {memory['rank']}: {memory['content']}")
 ```
 
-完整 API 文档：[docs/API-USAGE.md](docs/API-USAGE.md)
+**V2 部署文档**: [DEPLOYMENT_V2.md](DEPLOYMENT_V2.md)  
+完整 API 文档：[docs/API-USAGE.md](docs/API-USAGE.md)  
 Hermes 适配器文档：[docs/HERMES-INTEGRATION.md](docs/HERMES-INTEGRATION.md)
 
 ### 持久化记忆 API
 
 ```bash
+# 启动服务 (默认使用 V2)
+export MNEMOSYNE_RANKER_VERSION=v2  # 或 hybrid
+python -m uvicorn docker.server:app --host 0.0.0.0 --port 8000
+
+# 写入记忆
 curl -X POST http://localhost:8000/memories \
   -H 'Content-Type: application/json' \
   -d '{"id":"m-1","content":"配置代理服务器","scope_level":"global","destination":"local"}'
 
+# 检索排序
 curl -X POST http://localhost:8000/retrieve_store \
   -H 'Content-Type: application/json' \
   -d '{"query":"代理","memories":[],"top_k":5,"scope_level":"global","destination":"local"}'
@@ -200,7 +212,13 @@ docker build -t mnemosyne-mns:portable .
 docker run --rm -p 8000:8000 mnemosyne-mns:portable
 ```
 
-完整说明：[docs/PORTABLE-DEPLOYMENT.md](docs/PORTABLE-DEPLOYMENT.md)。Docker 镜像使用离线模型目录，不在启动时联网下载。C++/ONNX 文件目前是参考集成，尚未在本机编译验证，不宣称为独立可执行发布物。
+完整说明：[docs/PORTABLE-DEPLOYMENT.md](docs/PORTABLE-DEPLOYMENT.md)。Docker 镜像使用离线模型目录，不在启动时联网下载。`cpp/mnemosyne_inference.cpp` 仍是 ONNX Runtime 的参考集成，尚未作为独立 Ranker 发布；它需要单独验证 tokenizer 与 Hybrid 特征的数值一致性。
+
+### Native C++ session gateway
+
+默认 session-mode 的 HTTP 数据平面现有原生 C++ 实现：认证、SQLite/WAL 写入、FTS 更新和 `/context/recent` 的按时间读取不再依赖 Python、PyTorch 或 Transformers。它与现有 Python gateway 共用 `memories`/`memories_fts` schema，并保持 Hermes provider 使用的 `/health`、`/context/turn`、`/context/checkpoint` 和 `/context/recent` 合约。
+
+Hybrid Ranker、experimental-global、Shadow 数据导出仍保留在 Python 侧，直到 ONNX tokenizer 和模型特征获得端到端一致性验证；不能为了迁移而降低检索质量。构建、切换、回滚与性能验证见 [docs/NATIVE-GATEWAY.md](docs/NATIVE-GATEWAY.md)。
 
 ## 验证
 

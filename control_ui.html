@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>MNEMOSYNE-MNS · 控制台</title>
+  <style>
+    :root {
+      --bg: #081015; --panel: #0d171d; --panel-2: #111f27; --panel-3: #152832;
+      --line: #263b45; --line-soft: rgba(139, 190, 199, .14); --text: #edf6f6;
+      --muted: #91a8ae; --dim: #607880; --cyan: #67dbe1; --green: #87d7a4;
+      --amber: #f3c56e; --violet: #b7a0f4; --coral: #f28e83; --danger: #ff8f8f;
+      --shadow: 0 18px 55px rgba(0, 0, 0, .28); --radius: 12px;
+      --font: Inter, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--bg); }
+    body { margin: 0; min-height: 100vh; color: var(--text); font-family: var(--font); background:
+      radial-gradient(ellipse at 7% 0%, rgba(49, 147, 155, .14), transparent 34%),
+      radial-gradient(ellipse at 92% 6%, rgba(119, 81, 174, .13), transparent 32%), var(--bg); }
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; }
+    .shell { width: min(100% - 48px, 1540px); margin: 0 auto; padding: 28px 0 48px; }
+    .topbar { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; padding-bottom: 24px; border-bottom: 1px solid var(--line-soft); }
+    .eyebrow { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 11px; letter-spacing: 1.6px; font-weight: 700; }
+    .eyebrow::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--cyan); box-shadow: 0 0 16px rgba(103, 219, 225, .65); }
+    h1 { margin: 14px 0 7px; font-size: clamp(30px, 4vw, 50px); letter-spacing: -1.6px; line-height: 1.05; }
+    h1 span { color: var(--cyan); }
+    .subtitle { margin: 0; max-width: 700px; color: var(--muted); font-size: 14px; line-height: 1.65; }
+    .top-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+    .status-pill, .tag { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; color: var(--muted); font-size: 12px; background: rgba(18, 33, 41, .72); white-space: nowrap; }
+    .status-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--amber); }
+    .status-pill.online { color: var(--green); border-color: rgba(135, 215, 164, .32); }
+    .status-pill.online::before { background: var(--green); box-shadow: 0 0 10px rgba(135, 215, 164, .8); }
+    .status-pill.offline { color: var(--danger); border-color: rgba(255, 143, 143, .3); }
+    .status-pill.offline::before { background: var(--danger); }
+    .button { border: 1px solid var(--line); border-radius: 9px; min-height: 40px; padding: 0 15px; color: var(--text); background: var(--panel-2); transition: transform .16s ease, border-color .16s ease, background .16s ease; }
+    .button:hover { transform: translateY(-1px); border-color: rgba(103, 219, 225, .58); background: var(--panel-3); }
+    .button:active { transform: scale(.98); }
+    .button.primary { color: #061215; border-color: transparent; background: var(--cyan); font-weight: 700; }
+    .button.primary:hover { background: #8ae8eb; }
+    .button.subtle { color: var(--muted); background: transparent; }
+    .button:disabled { cursor: not-allowed; opacity: .46; transform: none; }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; margin-top: 20px; }
+    .card { grid-column: span 3; min-width: 0; border: 1px solid var(--line-soft); border-radius: var(--radius); background: linear-gradient(145deg, rgba(19, 36, 44, .91), rgba(10, 20, 26, .95)); box-shadow: var(--shadow); }
+    .metric { padding: 17px 18px; min-height: 124px; }
+    .metric .label { color: var(--muted); font-size: 12px; }
+    .metric .value { margin: 14px 0 8px; font-size: 25px; letter-spacing: -.8px; font-variant-numeric: tabular-nums; }
+    .metric .hint { color: var(--dim); font-size: 11px; }
+    .metric.cyan .value { color: var(--cyan); } .metric.green .value { color: var(--green); }
+    .metric.violet .value { color: var(--violet); } .metric.amber .value { color: var(--amber); }
+    .card.wide { grid-column: span 8; } .card.side { grid-column: span 4; }
+    .card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--line-soft); }
+    .card-head h2 { margin: 0; font-size: 14px; letter-spacing: .3px; }
+    .card-head small { color: var(--dim); font-size: 11px; }
+    .card-body { padding: 17px 18px; }
+    .progress-list { display: grid; gap: 16px; }
+    .progress-row { display: grid; gap: 8px; }
+    .progress-label { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; }
+    .progress-label strong { color: var(--text); font-weight: 600; }
+    .bar { height: 7px; overflow: hidden; border-radius: 99px; background: #1a2b33; }
+    .bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--cyan), #9ae8d3); }
+    .bar i.violet { background: linear-gradient(90deg, var(--violet), #dfc7ff); }
+    .bar i.amber { background: linear-gradient(90deg, var(--amber), #ffe5a7); }
+    .milestones { display: grid; gap: 12px; }
+    .milestone { display: grid; grid-template-columns: 27px 1fr auto; gap: 10px; align-items: center; }
+    .milestone .dot { width: 27px; height: 27px; display: grid; place-items: center; border-radius: 8px; color: #071114; background: var(--green); font-size: 12px; font-weight: 800; }
+    .milestone.pending .dot { color: var(--amber); background: rgba(243, 197, 110, .14); border: 1px solid rgba(243, 197, 110, .34); }
+    .milestone b { display: block; font-size: 12px; font-weight: 600; } .milestone span { display: block; margin-top: 3px; color: var(--dim); font-size: 11px; }
+    .milestone em { color: var(--green); font-size: 11px; font-style: normal; } .milestone.pending em { color: var(--amber); }
+    .console { grid-column: span 8; }
+    .settings { grid-column: span 4; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    label { display: grid; gap: 7px; color: var(--muted); font-size: 11px; }
+    label.full { grid-column: 1 / -1; }
+    input, textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; outline: none; color: var(--text); background: rgba(5, 13, 17, .58); padding: 10px 11px; transition: border-color .16s ease, box-shadow .16s ease; }
+    input { height: 40px; } textarea { min-height: 88px; resize: vertical; line-height: 1.5; }
+    input:focus, textarea:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(103, 219, 225, .1); }
+    .field-note { margin: 5px 0 0; color: var(--dim); font-size: 10px; line-height: 1.5; }
+    .actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
+    .output { margin-top: 15px; min-height: 75px; max-height: 285px; overflow: auto; border: 1px solid var(--line-soft); border-radius: 8px; padding: 12px; color: #b8ced1; background: rgba(3, 10, 13, .58); font: 11px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; }
+    .output.empty { color: var(--dim); font-family: var(--font); }
+    .endpoint-list { display: grid; gap: 8px; }
+    .endpoint { display: flex; justify-content: space-between; gap: 12px; padding: 9px 10px; border: 1px solid var(--line-soft); border-radius: 8px; background: rgba(17, 31, 39, .5); }
+    .endpoint code { color: var(--cyan); font-size: 11px; } .endpoint span { color: var(--dim); font-size: 10px; text-align: right; }
+    .log { display: grid; gap: 9px; max-height: 165px; overflow: auto; }
+    .log-item { display: grid; grid-template-columns: 65px 1fr; gap: 8px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .log-item time { color: var(--dim); font-variant-numeric: tabular-nums; }
+    .footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 20px; color: var(--dim); font-size: 11px; }
+    .footer a { color: var(--cyan); text-decoration: none; }
+    @media (max-width: 1050px) { .card { grid-column: span 6; } .wide, .side, .console, .settings { grid-column: span 12 !important; } }
+    @media (max-width: 620px) { .shell { width: min(100% - 28px, 1540px); padding-top: 20px; } .topbar { display: block; } .top-actions { justify-content: flex-start; margin-top: 18px; } .card { grid-column: span 12; } .form-grid { grid-template-columns: 1fr; } label.full { grid-column: auto; } .footer { display: block; } .footer span { display: block; margin-top: 6px; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">MEMORY NAVIGATION &amp; SCHEDULING SYSTEM · CONTROL PLANE</div>
+        <h1><span>MNEMOSYNE</span>-MNS 控制台</h1>
+        <p class="subtitle">观察服务健康度、确认当前运行模式，并用最小权限操作 session context。写入与检索保持显式边界，不在浏览器中自动提交长期记忆。</p>
+      </div>
+      <div class="top-actions">
+        <div id="status" class="status-pill">未连接</div>
+        <button class="button primary" id="refreshBtn">刷新状态</button>
+      </div>
+    </header>
+
+    <section class="grid" aria-label="项目状态摘要">
+      <article class="card metric cyan"><div class="label">运行模式</div><div id="modeValue" class="value">—</div><div id="modeHint" class="hint">等待 API 响应</div></article>
+      <article class="card metric green"><div class="label">服务版本</div><div id="versionValue" class="value">—</div><div id="modelHint" class="hint">RANK 模型尚未读取</div></article>
+      <article class="card metric violet"><div class="label">检索排序基线</div><div class="value">0.5796</div><div class="hint">报告记录 NDCG@10 · Hybrid</div></article>
+      <article class="card metric amber"><div class="label">验证覆盖</div><div class="value">263+</div><div class="hint">P3 报告记录 pytest 通过数</div></article>
+
+      <article class="card wide">
+        <div class="card-head"><h2>项目进度 · DELIVERY TRACK</h2><small>基于仓库交付报告与当前 API 结构</small></div>
+        <div class="card-body"><div class="progress-list">
+          <div class="progress-row"><div class="progress-label"><strong>核心 API / 持久化记忆</strong><span>已交付</span></div><div class="bar"><i style="width:100%"></i></div></div>
+          <div class="progress-row"><div class="progress-label"><strong>Hermes MemoryProvider 集成</strong><span>已交付</span></div><div class="bar"><i class="violet" style="width:100%"></i></div></div>
+          <div class="progress-row"><div class="progress-label"><strong>P1–P3 数据与训练闭环</strong><span>已实现 / toy 验证</span></div><div class="bar"><i class="amber" style="width:82%"></i></div></div>
+          <div class="progress-row"><div class="progress-label"><strong>真实授权数据上的迭代评估</strong><span>待推进</span></div><div class="bar"><i style="width:28%; opacity:.7"></i></div></div>
+        </div></div>
+      </article>
+
+      <article class="card side">
+        <div class="card-head"><h2>里程碑</h2><small>当前仓库快照</small></div>
+        <div class="card-body"><div class="milestones">
+          <div class="milestone"><div class="dot">✓</div><div><b>Session context 链路</b><span>/context/turn + /context/recent</span></div><em>READY</em></div>
+          <div class="milestone"><div class="dot">✓</div><div><b>Shadow / ranking 工具</b><span>可回放、可评估、可采样</span></div><em>READY</em></div>
+          <div class="milestone pending"><div class="dot">•</div><div><b>控制台接入部署</b><span>本页为第一版操作面板</span></div><em>PREVIEW</em></div>
+        </div></div>
+      </article>
+
+      <article class="card console">
+        <div class="card-head"><h2>Session 操作台</h2><small>最小操作集 · 不触碰全局自动写入</small></div>
+        <div class="card-body">
+          <div class="form-grid">
+            <label>Session ID<input id="sessionId" value="console-session-001" autocomplete="off"></label>
+            <label>Project ID<input id="projectId" value="mnemosyne-mns" autocomplete="off"></label>
+            <label class="full">查询最近上下文<textarea id="queryText" placeholder="例如：当前项目的检索排序基线是什么？"></textarea></label>
+            <label>用户消息<textarea id="userText" placeholder="写入一轮 session turn 的 user 内容"></textarea></label>
+            <label>助手消息<textarea id="assistantText" placeholder="写入一轮 session turn 的 assistant 内容"></textarea></label>
+          </div>
+          <div class="actions"><button class="button primary" id="recentBtn">读取最近上下文</button><button class="button" id="turnBtn">记录本轮上下文</button><button class="button subtle" id="clearBtn">清空输出</button></div>
+          <div id="output" class="output empty">操作结果会显示在这里。首次使用请先配置 API 地址与 Bearer Token。</div>
+        </div>
+      </article>
+
+      <article class="card settings">
+        <div class="card-head"><h2>连接设置</h2><small>凭据仅保留在当前页面</small></div>
+        <div class="card-body">
+          <label>API Base URL<input id="baseUrl" value="http://localhost:8000" autocomplete="url"></label>
+          <label style="margin-top:12px">Bearer Token<input id="apiKey" type="password" placeholder="MNEMOSYNE_API_KEY（可留空）" autocomplete="off"></label>
+          <p class="field-note">不会把 Token 写入 localStorage。若服务未设置 MNEMOSYNE_API_KEY，可留空；生产环境建议始终启用鉴权。</p>
+          <div class="actions"><button class="button primary" id="saveBtn">应用连接设置</button><button class="button" id="healthBtn">仅检查健康</button></div>
+        </div>
+        <div class="card-head"><h2>实时活动</h2><small id="lastUpdated">尚无记录</small></div>
+        <div class="card-body"><div id="log" class="log"><div class="log-item"><time>—</time><span>控制台已加载，等待操作。</span></div></div></div>
+      </article>
+
+      <article class="card wide">
+        <div class="card-head"><h2>当前可用接口</h2><small>以服务端 memory mode 为准</small></div>
+        <div class="card-body"><div class="endpoint-list">
+          <div class="endpoint"><code>GET /health</code><span>公开健康检查</span></div>
+          <div class="endpoint"><code>POST /context/turn</code><span>session turn 持久化</span></div>
+          <div class="endpoint"><code>POST /context/recent</code><span>按 session 读取上下文</span></div>
+          <div class="endpoint"><code>POST /context/checkpoint</code><span>显式 checkpoint</span></div>
+        </div></div>
+      </article>
+      <article class="card side">
+        <div class="card-head"><h2>安全边界</h2><small>RESEARCH / SESSION</small></div>
+        <div class="card-body"><p class="subtitle" style="font-size:12px">当前控制台只暴露 session 级操作。experimental_global、write proposal 与 legacy retrieve 不会被默认按钮静默调用；需要在服务端显式启用并通过 API 文档操作。</p></div>
+      </article>
+    </section>
+    <footer class="footer"><span>MNEMOSYNE-MNS · local control surface · v0.1</span><span>API docs: <a id="docsLink" href="http://localhost:8000/docs" target="_blank" rel="noreferrer">/docs</a></span></footer>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const state = { baseUrl: $('baseUrl').value, apiKey: '', busy: false };
+    function base() { return state.baseUrl.replace(/\/+$/, ''); }
+    function log(message) {
+      const now = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+      const item = document.createElement('div'); item.className = 'log-item';
+      const time = document.createElement('time'); time.textContent = now;
+      const text = document.createElement('span'); text.textContent = message;
+      item.append(time, text);
+      $('log').prepend(item); $('lastUpdated').textContent = now;
+    }
+    function show(value, empty = false) { const out = $('output'); out.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2); out.classList.toggle('empty', empty); }
+    function headers(json = false) { const h = {}; if (json) h['Content-Type'] = 'application/json'; if (state.apiKey.trim()) h.Authorization = `Bearer ${state.apiKey.trim()}`; return h; }
+    async function request(path, options = {}) {
+      const response = await fetch(`${base()}${path}`, { ...options, headers: { ...headers(Boolean(options.body)), ...(options.headers || {}) } });
+      const raw = await response.text(); let data; try { data = raw ? JSON.parse(raw) : {}; } catch { data = raw; }
+      if (!response.ok) throw new Error(`${response.status} ${typeof data === 'string' ? data : (data.detail || JSON.stringify(data))}`);
+      return data;
+    }
+    function setBusy(value) { state.busy = value; document.querySelectorAll('button').forEach(btn => btn.disabled = value); }
+    async function health(withRoot = false) {
+      if (state.busy) return; setBusy(true); $('status').className = 'status-pill'; $('status').textContent = '连接中';
+      try {
+        const data = await request('/health'); $('status').className = 'status-pill online'; $('status').textContent = '服务在线';
+        $('versionValue').textContent = data.version || '—'; $('modelHint').textContent = data.model || 'model unknown';
+        if (withRoot) { const root = await request('/'); $('modeValue').textContent = root.memory_mode || '—'; $('modeHint').textContent = `${Object.keys(root.endpoints || {}).length} 个 mode-aware 接口`; }
+        log(`健康检查成功 · ${data.model || 'service'}`); return data;
+      } catch (error) { $('status').className = 'status-pill offline'; $('status').textContent = '连接失败'; $('modeValue').textContent = '—'; show(error.message); log(`请求失败 · ${error.message}`); }
+      finally { setBusy(false); }
+    }
+    $('refreshBtn').onclick = () => health(true);
+    $('healthBtn').onclick = () => health(false);
+    $('saveBtn').onclick = () => { state.baseUrl = $('baseUrl').value.trim() || location.origin; state.apiKey = $('apiKey').value; $('docsLink').href = `${base()}/docs`; log(`连接设置已应用 · ${base()}`); health(Boolean(state.apiKey.trim())); };
+    $('recentBtn').onclick = async () => {
+      if (state.busy) return; setBusy(true);
+      try { const data = await request('/context/recent', { method: 'POST', body: JSON.stringify({ session_id: $('sessionId').value.trim(), project_id: $('projectId').value.trim(), max_tokens: 4000, tokens_per_memory: 200 }) }); show(data); log(`读取最近上下文 · ${data.results?.length || 0} 条 · ${data.token_cost || 0} tokens`); }
+      catch (error) { show(error.message); log(`读取上下文失败 · ${error.message}`); } finally { setBusy(false); }
+    };
+    $('turnBtn').onclick = async () => {
+      if (state.busy) return; setBusy(true);
+      try { const data = await request('/context/turn', { method: 'POST', body: JSON.stringify({ session_id: $('sessionId').value.trim(), turn_id: `console-${Date.now()}`, project_id: $('projectId').value.trim(), user_text: $('userText').value, assistant_text: $('assistantText').value, destination: 'local' }) }); show(data); log(`上下文已记录 · ${data.memory_id || 'memory'}`); }
+      catch (error) { show(error.message); log(`记录上下文失败 · ${error.message}`); } finally { setBusy(false); }
+    };
+    $('clearBtn').onclick = () => show('操作结果会显示在这里。', true);
+    $('baseUrl').addEventListener('change', () => { $('docsLink').href = `${$('baseUrl').value.replace(/\/+$/, '')}/docs`; });
+  </script>
+</body>
+</html>

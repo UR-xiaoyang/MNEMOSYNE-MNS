@@ -1,7 +1,6 @@
 {
   "experiment": "bayesian_uncertainty_modeling",
-  "dataset": "data/shadow_export",
-  "n_traces": 10418,
+  "dataset": "synthetic",
   "scipy_available": true,
   "pymc_available": false,
   "conclusion": "Bayesian methods provide uncertainty quantification for memory quality",

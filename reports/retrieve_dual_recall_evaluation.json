@@ -1,0 +1,186 @@
+{
+  "test_queries_count": 14,
+  "fts_baseline": {
+    "avg_latency_ms": 0.10877143358811736,
+    "avg_coverage": 0.14285714285714285,
+    "memory_usage_mb": 0.28125
+  },
+  "dual_recall": {
+    "avg_latency_ms": 20.43187856907025,
+    "avg_coverage": 37.0,
+    "memory_usage_mb": 5.58984375,
+    "faiss_enabled": true
+  },
+  "comparison": {
+    "latency_increase_ms": 20.323107135482132,
+    "latency_increase_percent": 18684.232123334183,
+    "coverage_increase": 36.857142857142854,
+    "memory_increase_mb": 5.30859375
+  },
+  "fts_recall@100": 0.07142857142857142,
+  "dual_recall@100": 1.0,
+  "recall_improvement_absolute": 0.9285714285714286,
+  "recall_improvement_percent": 1300.0000000000002,
+  "query_details": [
+    {
+      "query": "怎么让程序走跳板机访问外网",
+      "ground_truth": [
+        "sem:001"
+      ],
+      "fts_recall": 0.0,
+      "dual_recall": 1.0,
+      "fts_found": 0,
+      "dual_found": 1,
+      "improvement": 1.0
+    },
+    {
+      "query": "如何让 git 通过中转服务器连接",
+      "ground_truth": [
+        "sem:002"
+      ],
+      "fts_recall": 1.0,
+      "dual_recall": 1.0,
+      "fts_found": 1,
+      "dual_found": 1,
+      "improvement": 0.0
+    },
+    {
+      "query": "数据库查询太慢怎么办",
+      "ground_truth": [
+        "sem:003",
+        "sem:004",
+        "sem:005"
+      ],
+      "fts_recall": 0.0,
+      "dual_recall": 1.0,
+      "fts_found": 0,
+      "dual_found": 3,
+      "improvement": 1.0
+    },
+    {
+      "query": "系统响应时间长如何改善",
+      "ground_truth": [
+        "sem:005"
+      ],
+      "fts_recall": 0.0,
+      "dual_recall": 1.0,
+      "fts_found": 0,
+      "dual_found": 1,
+      "improvement": 1.0
+    },
+    {
+      "query": "怎样查看程序运行时的变量值",
+      "ground_truth": [
+        "sem:006",
+        "sem:007"
+      ],
+      "fts_recall": 0.0,
+      "dual_recall": 1.0,
+      "fts_found": 0,
+      "dual_found": 2,
+      "improvement": 1.0
+    },
+    {
+      "query": "如何找到内存没释放的地方",
+      "ground_truth": [
+        "sem:008"
+      ],
+      "fts_recall": 0.0,
+      "dual_recall": 1.0,
+      "fts_found": 0,
+      "dual_found": 1,
+      "improvement": 1.0
+    },
+    {
+      "query": "大型系统怎么设计才能容错",
+      "ground_truth": [
+        "sem:009",
+        "sem:010"
+      ],
+      "fts_recall": 0.0,
+      "dual_recall": 1.0,
+      "fts_found": 0,
+      "dual_found": 2,
+      "improvement": 1.0
+    },
+    {
+      "query": "多个服务之间如何解除耦合",
+      "ground_truth": [
+        "sem:011"
+      ],
+      "fts_recall": 0.0,
+      "dual_recall": 1.0,
+      "fts_found": 0,
+      "dual_found": 1,
+      "improvement": 1.0
+    },
+    {
+      "query": "如何减小容器镜像的体积",
+      "ground_truth": [
+        "sem:012"
+      ],
+      "fts_recall": 0.0,
+      "dual_recall": 1.0,
+      "fts_found": 0,
+      "dual_found": 1,
+      "improvement": 1.0
+    },
+    {
+      "query": "怎么管理多个容器服务",
+      "ground_truth": [
+        "sem:013",
+        "sem:014"
+      ],
+      "fts_recall": 0.0,
+      "dual_recall": 1.0,
+      "fts_found": 0,
+      "dual_found": 2,
+      "improvement": 1.0
+    },
+    {
+      "query": "如何衡量模型找全样本的能力",
+      "ground_truth": [
+        "sem:015"
+      ],
+      "fts_recall": 0.0,
+      "dual_recall": 1.0,
+      "fts_found": 0,
+      "dual_found": 1,
+      "improvement": 1.0
+    },
+    {
+      "query": "怎么评估预测结果的准确程度",
+      "ground_truth": [
+        "sem:016",
+        "sem:017"
+      ],
+      "fts_recall": 0.0,
+      "dual_recall": 1.0,
+      "fts_found": 0,
+      "dual_found": 2,
+      "improvement": 1.0
+    },
+    {
+      "query": "接口应该用什么方法表示操作",
+      "ground_truth": [
+        "sem:018"
+      ],
+      "fts_recall": 0.0,
+      "dual_recall": 1.0,
+      "fts_found": 0,
+      "dual_found": 1,
+      "improvement": 1.0
+    },
+    {
+      "query": "请求失败了该返回什么代码",
+      "ground_truth": [
+        "sem:019"
+      ],
+      "fts_recall": 0.0,
+      "dual_recall": 1.0,
+      "fts_found": 0,
+      "dual_found": 1,
+      "improvement": 1.0
+    }
+  ]
+}

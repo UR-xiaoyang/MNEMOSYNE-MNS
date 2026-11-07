@@ -106,10 +106,24 @@ class MemoryEntity:
     egress: Egress
     provenance: Provenance
     
-    def hard_filter(self, query_scope_level: str, query_destination: str, strict_validity: bool = True) -> bool:
-        """Check if this memory passes hard filters for a query."""
+    def hard_filter(
+        self,
+        query_scope_level: str,
+        query_destination: str,
+        strict_validity: bool = True,
+        *,
+        session_id: str | None = None,
+        project_id: str | None = None,
+    ) -> bool:
+        """Check visibility, identity, egress and validity for a contextual query."""
         # Scope filter
         if query_scope_level not in self.scope.visibility:
+            return False
+        # Scope level alone is not an identity boundary. Session/project entities
+        # are visible only to the session/project that created them.
+        if self.scope.level == "session" and self.scope.session_id != session_id:
+            return False
+        if self.scope.level == "project" and self.scope.project_id and self.scope.project_id != project_id:
             return False
         
         # Egress filter
@@ -259,6 +273,8 @@ def memory_from_api(
     *,
     destination: str = "local",
     scope_level: Literal["session", "project", "global"] = "global",
+    session_id: str | None = None,
+    project_id: str | None = None,
 ) -> MemoryEntity:
     """Create deterministic metadata for an API-supplied memory.
 
@@ -278,7 +294,7 @@ def memory_from_api(
         created_at=now,
         updated_at=now,
         version=1,
-        scope=Scope(level=scope_level, visibility=visibility),
+        scope=Scope(level=scope_level, session_id=session_id, project_id=project_id, visibility=visibility),
         authority=Authority(
             class_="inferred",
             priority=30,

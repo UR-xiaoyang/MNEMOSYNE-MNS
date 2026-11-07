@@ -3,7 +3,13 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
+import platform
+import random
+import subprocess
+import sys
 import time
+import uuid
 from collections import defaultdict
 from pathlib import Path
 
@@ -14,8 +20,44 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from transformers import AutoModel, AutoTokenizer
 
+try:
+    from run_output_manager import compute_file_hash, prepare_output_directory, build_training_manifest
+except ModuleNotFoundError as exc:
+    # Only fallback to package import if run_output_manager itself is missing.
+    # Re-raise if the error is from an internal import within run_output_manager.
+    if exc.name == 'run_output_manager':
+        from .run_output_manager import compute_file_hash, prepare_output_directory, build_training_manifest
+    else:
+        raise
+
 DEFAULT_FEATURE_DIR = Path("C:/Users/xiaoyang/memory_dataset/features_v1")
 DEFAULT_E5_MODEL = "intfloat/multilingual-e5-small"
+
+
+def get_git_sha() -> str | None:
+    """Get current git SHA, or None if not in a git repo."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return None
+
+
+def set_seed(seed: int) -> None:
+    """Set random seeds for Python, NumPy, and PyTorch."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -97,8 +139,17 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, default=Path("runs/rank_hybrid_v1"))
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--max-length", type=int, default=256)
+    parser.add_argument("--seed", type=int, required=True, help="Random seed for reproducibility")
+    parser.add_argument("--overwrite", action="store_true", help="Allow overwriting existing output directory")
     args = parser.parse_args()
-    args.output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Prepare output directory with atomic isolation
+    overwrite_audit = prepare_output_directory(args.output_dir, args.overwrite)
+    
+    # Set random seeds
+    set_seed(args.seed)
+    
+    run_id = str(uuid.uuid4())
     started = time.time()
 
     train_all = read_jsonl(args.feature_dir / "rerank_train_pairs.jsonl")
@@ -144,7 +195,92 @@ def main() -> None:
     train_scores = scaler.transform(train_combined) @ ranker.coef_[0]
     val_scores = scaler.transform(val_combined) @ ranker.coef_[0]
     
+    elapsed = time.time() - started
+    
     feature_names = ["e5_cosine"] + json.loads((args.feature_dir / "rerank_extra_features.json").read_text(encoding="utf-8"))
+    
+    # Collect dependency versions
+    import sklearn
+    import transformers
+    dependencies = {
+        "python": platform.python_version(),
+        "numpy": np.__version__,
+        "torch": torch.__version__,
+        "sklearn": sklearn.__version__,
+        "transformers": transformers.__version__,
+        "joblib": joblib.__version__,
+    }
+    
+    # Compute input file hashes and counts
+    train_pairs_path = args.feature_dir / "rerank_train_pairs.jsonl"
+    val_pairs_path = args.feature_dir / "rerank_validation_pairs.jsonl"
+    
+    input_hashes = {
+        "train_pairs": compute_file_hash(train_pairs_path),
+        "validation_pairs": compute_file_hash(val_pairs_path),
+        "train_extra_features": compute_file_hash(args.feature_dir / "rerank_train_extra.npy"),
+        "validation_extra_features": compute_file_hash(args.feature_dir / "rerank_validation_extra.npy"),
+    }
+    
+    counts = {
+        "train_rows": len(train_rows),
+        "val_rows": len(val_rows),
+        "train_queries": len(grouped(train_rows)),
+        "val_queries": len(grouped(val_rows)),
+        "train_pairs": len(pair_x),
+    }
+    
+    # Build complete manifest with reproducibility metadata
+    manifest = build_training_manifest(
+        run_id=run_id,
+        seed=args.seed,
+        input_hashes=input_hashes,
+        counts=counts,
+        elapsed_seconds=elapsed,
+        overwrite_audit=overwrite_audit,
+    )
+    
+    # Add extended fields for this specific training run
+    manifest.update({
+        "command_args": {
+            "feature_dir": str(args.feature_dir),
+            "e5_model": args.e5_model,
+            "output_dir": str(args.output_dir),
+            "batch_size": args.batch_size,
+            "max_length": args.max_length,
+            "seed": args.seed,
+            "overwrite": args.overwrite,
+        },
+        "git_sha": get_git_sha(),
+        "python_version": platform.python_version(),
+        "dependencies": dependencies,
+        "input_files": {
+            "train_pairs": {
+                "path": str(train_pairs_path),
+                "sha256": input_hashes["train_pairs"],
+                "total_rows": len(train_all),
+                "public_filtered_rows": len(train_rows),
+            },
+            "validation_pairs": {
+                "path": str(val_pairs_path),
+                "sha256": input_hashes["validation_pairs"],
+                "total_rows": len(val_all),
+                "public_filtered_rows": len(val_rows),
+            },
+            "train_extra_features": {
+                "path": str(args.feature_dir / "rerank_train_extra.npy"),
+                "sha256": input_hashes["train_extra_features"],
+            },
+            "validation_extra_features": {
+                "path": str(args.feature_dir / "rerank_validation_extra.npy"),
+                "sha256": input_hashes["validation_extra_features"],
+            },
+        },
+        "feature_dim": train_combined.shape[1],
+        "feature_names": feature_names,
+    })
+    
+    # Build legacy report for backward compatibility
     report = {
         "model_id": "MNEMOSYNE-MNS-RANK-HYBRID-01",
         "components": {
@@ -161,7 +297,7 @@ def main() -> None:
         "feature_names": feature_names,
         "train_metrics": ranking_metrics(train_rows, train_scores),
         "validation_metrics": ranking_metrics(val_rows, val_scores),
-        "elapsed_seconds": round(time.time() - started, 3),
+        "elapsed_seconds": round(elapsed, 3),
         "verification": {
             "grouped_pairwise_training": True,
             "public_only": True,
@@ -186,6 +322,11 @@ def main() -> None:
                 "label": row["label"],
                 "hybrid_score": float(score),
             }, ensure_ascii=False, separators=(",", ":")) + "\n")
+    
+    # Write manifest
+    (args.output_dir / "manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     
     (args.output_dir / "hybrid_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False, indent=2))

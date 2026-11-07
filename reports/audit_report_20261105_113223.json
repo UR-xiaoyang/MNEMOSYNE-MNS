@@ -1,0 +1,35 @@
+{
+  "generated_at": 1793849543.2142937,
+  "window_days": 7,
+  "metrics": {
+    "window_start": 1793244743.2086568,
+    "window_end": 1793849543.2086568,
+    "metrics": {
+      "citation_rate": 0.0,
+      "correction_rate": 0.0,
+      "context_pollution": 0.0,
+      "retrieval_latency_p99": 0.0,
+      "memory_growth_rate": 0.0,
+      "unknown_ratio": 0.0
+    },
+    "counts": {
+      "total_retrievals": 0,
+      "total_citations": 0,
+      "total_corrections": 0,
+      "total_ignored_injected": 0,
+      "total_candidates": 0
+    }
+  },
+  "alerts": [
+    {
+      "metric": "citation_rate",
+      "severity": "warning",
+      "message": "Citation rate below 30% - memories may not be relevant",
+      "threshold": 0.3,
+      "operator": "<",
+      "actual_value": 0.0,
+      "timestamp": 1793849543.2142937
+    }
+  ],
+  "status": "warning"
+}

@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>MNEMOSYNE-MNS｜A4 核心架构打印稿</title>
+  <style>
+    :root {
+      --ink:#17232a; --muted:#5d6d74; --line:#b8c5ca; --soft:#f3f6f7;
+      --cyan:#087e86; --cyan-fill:#e7f5f5; --green:#27734b; --green-fill:#eaf6ef;
+      --violet:#6548a5; --violet-fill:#f0ecfb; --amber:#966817; --amber-fill:#fff6df;
+      --coral:#a34840; --coral-fill:#fff0ed; --blue:#275d91; --blue-fill:#eaf3fc;
+      --font:"Segoe UI","Microsoft YaHei","PingFang SC",Arial,sans-serif;
+    }
+    *{box-sizing:border-box}
+    @page{size:A4 landscape;margin:0}
+    html,body{margin:0;background:#dfe5e8;color:var(--ink);font-family:var(--font);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .page{width:297mm;height:210mm;padding:8mm 9mm 6mm;margin:0 auto;background:#fff;overflow:hidden;page-break-after:always}
+    .page:last-child{page-break-after:auto}
+    .top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;padding-bottom:3.5mm;border-bottom:1px solid #8d9ca2}
+    .kicker{display:flex;align-items:center;gap:7px;color:var(--cyan);font-size:8px;font-weight:750;letter-spacing:1.3px}
+    .kicker:before{content:"";width:7px;height:7px;border-radius:2px;background:var(--cyan)}
+    h1{margin:4px 0 2px;font-size:21px;line-height:1.15;letter-spacing:-.25px}
+    .subtitle{margin:0;color:var(--muted);font-size:9px;line-height:1.4}
+    .top-right{text-align:right;min-width:210px;color:var(--muted);font-size:8px;line-height:1.45}
+    .top-right strong{display:block;color:var(--violet);font-size:8.5px}
+    .badges{display:flex;justify-content:flex-end;gap:4px;margin-top:5px;flex-wrap:wrap}
+    .badge{padding:2px 5px;border:1px solid var(--line);border-radius:3px;font-size:7.5px;white-space:nowrap}
+    .badge b{color:var(--ink)}
+    .section{margin-top:3.5mm;border:1px solid #8d9ca2;border-radius:4px;overflow:hidden}
+    .section-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:5px 8px 4px;background:var(--soft);border-bottom:1px solid var(--line)}
+    .section-head h2{margin:0;font-size:10.5px;letter-spacing:.15px}.section-head p{margin:0;color:var(--muted);font-size:7.5px}
+    .diagram{padding:3px 5px 4px;background:#fff}.diagram svg{display:block;width:100%;height:auto}
+    .legend{display:flex;flex-wrap:wrap;gap:9px;padding:3px 8px 5px;border-top:1px solid #e0e6e8;color:var(--muted);font-size:7.5px}
+    .legend span{display:inline-flex;align-items:center;gap:4px}.legend i{width:7px;height:7px;border:1px solid currentColor;border-radius:2px;display:inline-block}
+    .host{color:var(--cyan)}.service{color:var(--green)}.model{color:var(--violet)}.store{color:var(--amber)}.guard{color:var(--coral)}
+    .notes{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:3.5mm}.note{min-height:23mm;padding:7px 8px;border:1px solid var(--line);border-radius:4px;background:var(--soft)}
+    .note h3{display:flex;align-items:center;gap:5px;margin:0 0 4px;font-size:8.5px}.note h3:before{content:"";width:6px;height:6px;border-radius:2px;background:var(--cyan)}.note:nth-child(2) h3:before{background:var(--violet)}.note:nth-child(3) h3:before{background:var(--coral)}
+    .note p{margin:0;color:var(--muted);font-size:7.5px;line-height:1.55}.note b{color:var(--ink)}
+    .footer{display:flex;justify-content:space-between;gap:12px;margin-top:2.5mm;color:var(--muted);font-size:7px}.footer b{color:var(--ink)}
+    @media screen{.page{box-shadow:0 2px 18px rgba(24,40,48,.18)}}
+    @media print{html,body{background:#fff}.page{margin:0;box-shadow:none}}
+  </style>
+</head>
+<body>
+  <!-- PAGE 1: online runtime -->
+  <section class="page">
+    <header class="top">
+      <div><div class="kicker">MEMORY NAVIGATION &amp; SCHEDULING SYSTEM</div><h1>MNEMOSYNE-MNS 核心架构</h1><p class="subtitle">A4 打印稿 · 第 1 页 / 2 · 在线运行时与记忆生命周期</p></div>
+      <div class="top-right"><strong>ONLINE RUNTIME ARCHITECTURE</strong>FastAPI · SQLite / FTS5 · local-first<div class="badges"><span class="badge"><b>写入</b> 显式提交</span><span class="badge"><b>上下文</b> session 作用域</span><span class="badge"><b>观测</b> Shadow 可选</span></div></div>
+    </header>
+    <section class="section">
+      <div class="section-head"><h2>01 · 在线运行时架构</h2><p>请求 → 路由 → 硬过滤 → 排序 → 上下文准入 → 注入宿主 Agent</p></div>
+      <div class="diagram">
+        <svg viewBox="0 0 1600 520" role="img" aria-label="MNEMOSYNE 在线运行时架构">
+          <defs>
+            <pattern id="g1" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M28 0H0V28" fill="none" stroke="#edf1f2" stroke-width=".8"/></pattern>
+            <marker id="a1c" markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#087e86"/></marker>
+            <marker id="a1g" markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#27734b"/></marker>
+            <marker id="a1v" markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#6548a5"/></marker>
+            <marker id="a1a" markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#966817"/></marker>
+            <marker id="a1r" markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#a34840"/></marker>
+          </defs>
+          <rect width="1600" height="520" fill="#fff"/><rect width="1600" height="520" fill="url(#g1)"/>
+          <!-- main arrows -->
+          <path d="M190 125H218" stroke="#087e86" stroke-width="2" fill="none" marker-end="url(#a1c)"/><path d="M438 125H466" stroke="#27734b" stroke-width="2" fill="none" marker-end="url(#a1g)"/><path d="M656 125H684" stroke="#27734b" stroke-width="2" fill="none" marker-end="url(#a1g)"/><path d="M884 125H912" stroke="#966817" stroke-width="2" fill="none" marker-end="url(#a1a)"/><path d="M1112 125H1140" stroke="#6548a5" stroke-width="2" fill="none" marker-end="url(#a1v)"/><path d="M1340 125H1368" stroke="#966817" stroke-width="2" fill="none" marker-end="url(#a1a)"/>
+          <text x="204" y="113" fill="#5d6d74" font-size="10" text-anchor="middle">turn</text><text x="452" y="113" fill="#5d6d74" font-size="10" text-anchor="middle">HTTP</text><text x="670" y="113" fill="#5d6d74" font-size="10" text-anchor="middle">route</text><text x="898" y="113" fill="#5d6d74" font-size="10" text-anchor="middle">candidates</text><text x="1126" y="113" fill="#5d6d74" font-size="10" text-anchor="middle">ranked</text><text x="1354" y="113" fill="#5d6d74" font-size="10" text-anchor="middle">admit</text>
+          <!-- main cards -->
+          <g><rect x="20" y="62" width="170" height="126" rx="6" fill="#e7f5f5" stroke="#087e86" stroke-width="1.5"/><circle cx="41" cy="86" r="5" fill="#087e86"/><text x="55" y="91" fill="#17232a" font-size="14" font-weight="700">Hermes Agent</text><text x="39" y="120" fill="#5d6d74" font-size="10.5">用户请求 / 对话生成</text><text x="39" y="141" fill="#5d6d74" font-size="10.5">prompt 构建</text><text x="39" y="166" fill="#087e86" font-size="9.5">宿主模型在系统外</text></g>
+          <g><rect x="218" y="62" width="220" height="126" rx="6" fill="#e7f5f5" stroke="#087e86" stroke-width="1.5"/><circle cx="239" cy="86" r="5" fill="#087e86"/><text x="253" y="91" fill="#17232a" font-size="14" font-weight="700">MemoryProvider</text><text x="237" y="120" fill="#5d6d74" font-size="10.5">异步 prefetch / inject</text><text x="237" y="141" fill="#5d6d74" font-size="10.5">session working context</text><text x="237" y="166" fill="#087e86" font-size="9.5">WRITE 只返回提案</text></g>
+          <g><rect x="466" y="62" width="190" height="126" rx="6" fill="#eaf6ef" stroke="#27734b" stroke-width="1.5"/><circle cx="487" cy="86" r="5" fill="#27734b"/><text x="501" y="91" fill="#17232a" font-size="14" font-weight="700">FastAPI</text><text x="484" y="120" fill="#5d6d74" font-size="10.5">/retrieve_store</text><text x="484" y="141" fill="#5d6d74" font-size="10.5">/route · /context</text><text x="484" y="166" fill="#27734b" font-size="9.5">Bearer key 可选</text></g>
+          <g><rect x="684" y="62" width="200" height="126" rx="6" fill="#eaf6ef" stroke="#27734b" stroke-width="1.5"/><circle cx="705" cy="86" r="5" fill="#27734b"/><text x="719" y="91" fill="#17232a" font-size="14" font-weight="700">ROUTE</text><text x="702" y="120" fill="#5d6d74" font-size="10.5">路径 / query kind</text><text x="702" y="141" fill="#5d6d74" font-size="10.5">authority / fallback</text><text x="702" y="166" fill="#27734b" font-size="9.5">确定性、可审计</text></g>
+          <g><rect x="912" y="52" width="200" height="146" rx="6" fill="#fff6df" stroke="#966817" stroke-width="1.5"/><circle cx="933" cy="76" r="5" fill="#966817"/><text x="947" y="81" fill="#17232a" font-size="14" font-weight="700">MemoryStore</text><text x="930" y="111" fill="#5d6d74" font-size="10.5">SQLite · memory.db · FTS5</text><text x="930" y="132" fill="#5d6d74" font-size="10.5">scope / identity / egress</text><text x="930" y="153" fill="#5d6d74" font-size="10.5">validity / supersede / version</text><text x="930" y="178" fill="#966817" font-size="9.5">硬过滤后返回候选集</text></g>
+          <g><rect x="1140" y="52" width="200" height="146" rx="6" fill="#f0ecfb" stroke="#6548a5" stroke-width="1.5"/><circle cx="1161" cy="76" r="5" fill="#6548a5"/><text x="1175" y="81" fill="#17232a" font-size="14" font-weight="700">RANK · Hybrid</text><text x="1158" y="111" fill="#5d6d74" font-size="10.5">Frozen E5 + 12 features</text><text x="1158" y="132" fill="#5d6d74" font-size="10.5">13 维输入 → score</text><text x="1158" y="153" fill="#5d6d74" font-size="10.5">Top-K ordering</text><text x="1158" y="178" fill="#6548a5" font-size="9.5">CPU inference</text></g>
+          <g><rect x="1368" y="52" width="212" height="146" rx="6" fill="#fff6df" stroke="#966817" stroke-width="1.5"/><circle cx="1389" cy="76" r="5" fill="#966817"/><text x="1403" y="81" fill="#17232a" font-size="14" font-weight="700">Context Assembly</text><text x="1386" y="111" fill="#5d6d74" font-size="10.5">validity / conflict filter</text><text x="1386" y="132" fill="#5d6d74" font-size="10.5">near-duplicate removal</text><text x="1386" y="153" fill="#5d6d74" font-size="10.5">token budget admission</text><text x="1386" y="178" fill="#966817" font-size="9.5">injected=true → prompt</text></g>
+          <!-- side branches -->
+          <path d="M328 188V244H210" stroke="#a34840" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#a1r)"/><path d="M210 338H912V198" stroke="#a34840" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#a1r)"/>
+          <rect x="28" y="244" width="300" height="94" rx="6" fill="#fff0ed" stroke="#a34840" stroke-width="1.3"/><text x="50" y="270" fill="#17232a" font-size="13" font-weight="700">WRITE / UPDATE</text><text x="50" y="295" fill="#5d6d74" font-size="10.5">/write_proposals 只生成提案</text><text x="50" y="317" fill="#a34840" font-size="10.5">/memories /supersede 必须显式提交</text>
+          <path d="M1470 198V244H1190" stroke="#a34840" stroke-width="1.4" stroke-dasharray="5 4" fill="none" marker-end="url(#a1r)"/><rect x="910" y="244" width="280" height="94" rx="6" fill="#fff0ed" stroke="#a34840" stroke-width="1.3" stroke-dasharray="5 4"/><text x="932" y="270" fill="#17232a" font-size="13" font-weight="700">SHADOW MODE · OPTIONAL</text><text x="932" y="295" fill="#5d6d74" font-size="10.5">retrieval / citation / ignored / correction</text><text x="932" y="317" fill="#a34840" font-size="10.5">默认关闭 · 仅写本地 trace</text>
+          <path d="M1048 198V244" stroke="#087e86" stroke-width="1.4" stroke-dasharray="5 4" fill="none" marker-end="url(#a1c)"/><rect x="590" y="244" width="320" height="94" rx="6" fill="#e7f5f5" stroke="#087e86" stroke-width="1.3"/><text x="612" y="270" fill="#17232a" font-size="13" font-weight="700">SESSION CONTEXT</text><text x="612" y="295" fill="#5d6d74" font-size="10.5">/context/turn · /checkpoint · 幂等</text><text x="612" y="317" fill="#087e86" font-size="10.5">同 session 可召回，不自动升级长期记忆</text>
+          <!-- final output -->
+          <path d="M1474 198V390" stroke="#966817" stroke-width="1.5" fill="none" marker-end="url(#a1a)"/><rect x="1368" y="390" width="212" height="84" rx="6" fill="#eaf6ef" stroke="#27734b" stroke-width="1.4"/><text x="1389" y="418" fill="#17232a" font-size="13" font-weight="700">Context → Host Model</text><text x="1389" y="443" fill="#5d6d74" font-size="10.5">注入 prompt · 生成 response</text><text x="1389" y="463" fill="#27734b" font-size="9.5">after-turn → session / trace</text>
+        </svg>
+      </div>
+      <div class="legend"><span class="host"><i></i>宿主 / Provider</span><span class="service"><i></i>服务 / 路由</span><span class="store"><i></i>存储 / 装配</span><span class="model"><i></i>模型推理</span><span class="guard"><i></i>写入 / 观测旁路</span><span>实线：在线主路径 · 虚线：显式或可选旁路</span></div>
+    </section>
+    <section class="notes"><article class="note"><h3>在线主链路</h3><p>ROUTE 产生路径与权限信号；MemoryStore 先按 scope、身份、egress 和 validity 过滤，再由 Hybrid RANK 排序。</p></article><article class="note"><h3>上下文边界</h3><p>session working context 可幂等记录和召回，但<strong>不会自动升级为 project / global 长期记忆</strong>。</p></article><article class="note"><h3>安全原则</h3><p>提案接口不落库；长期记忆新增或替换必须显式调用 API；Shadow Mode 默认关闭，仅记录本地 trace。</p></article></section>
+    <footer class="footer"><span><b>MNEMOSYNE-MNS</b> · Memory Navigation &amp; Scheduling System</span><span>A4 横向 · 第 1 / 2 页 · 建议打印：实际大小 / 横向 / 开启背景图形</span></footer>
+  </section>
+
+  <!-- PAGE 2: model architecture -->
+  <section class="page">
+    <header class="top">
+      <div><div class="kicker">MODEL ARCHITECTURE / RANK EXPERT</div><h1>RANK-HYBRID-01 模型内部架构</h1><p class="subtitle">A4 打印稿 · 第 2 页 / 2 · 冻结 E5 + 12 维结构化特征 + 成对 Logistic Ranker</p></div>
+      <div class="top-right"><strong>MNEMOSYNE-MNS-RANK-HYBRID-01</strong>当前推荐排序模型 · CPU inference<div class="badges"><span class="badge"><b>NDCG@10</b> 0.5796</span><span class="badge"><b>Recall@1</b> 0.4071</span><span class="badge"><b>E5</b> frozen</span></div></div>
+    </header>
+    <section class="section">
+      <div class="section-head"><h2>02 · 模型数据流</h2><p>Query / Memory → E5 语义分支 + 结构化分支 → 13 维排序输入 → Top-K</p></div>
+      <div class="diagram">
+        <svg viewBox="0 0 1600 535" role="img" aria-label="RANK Hybrid 模型内部架构">
+          <defs>
+            <pattern id="g2" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M28 0H0V28" fill="none" stroke="#edf1f2" stroke-width=".8"/></pattern>
+            <marker id="a2c" markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#087e86"/></marker>
+            <marker id="a2v" markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#6548a5"/></marker>
+            <marker id="a2a" markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#966817"/></marker>
+            <marker id="a2g" markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#27734b"/></marker>
+          </defs>
+          <rect width="1600" height="535" fill="#fff"/><rect width="1600" height="535" fill="url(#g2)"/>
+          <rect x="20" y="20" width="1560" height="42" rx="5" fill="#f3f6f7" stroke="#b8c5ca"/><text x="40" y="47" fill="#17232a" font-size="11" font-weight="700">模型前置硬过滤</text><text x="175" y="47" fill="#5d6d74" font-size="10.5">scope · egress · validity · session/project identity · authority gate</text><text x="1558" y="47" fill="#5d6d74" font-size="9.5" text-anchor="end">由规则与 MemoryStore 负责，不是学习参数</text>
+          <!-- connectors -->
+          <path d="M182 142H218" stroke="#087e86" stroke-width="2" fill="none" marker-end="url(#a2c)"/><path d="M182 290H218" stroke="#087e86" stroke-width="2" fill="none" marker-end="url(#a2c)"/><path d="M492 215H530" stroke="#6548a5" stroke-width="2" fill="none" marker-end="url(#a2v)"/><path d="M492 215H510V377H530" stroke="#966817" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#a2a)"/><path d="M740 215H775" stroke="#6548a5" stroke-width="2" fill="none" marker-end="url(#a2v)"/><path d="M740 377H775" stroke="#966817" stroke-width="2" fill="none" marker-end="url(#a2a)"/><path d="M975 215H1010" stroke="#275d91" stroke-width="2" fill="none" marker-end="url(#a2v)"/><path d="M975 377H993V215H1010" stroke="#966817" stroke-width="2" fill="none" marker-end="url(#a2a)"/><path d="M1215 215H1250" stroke="#27734b" stroke-width="2" fill="none" marker-end="url(#a2g)"/><path d="M1438 215H1470" stroke="#27734b" stroke-width="2" fill="none" marker-end="url(#a2g)"/>
+          <text x="200" y="130" fill="#5d6d74" font-size="9.5" text-anchor="middle">q / m</text><text x="510" y="201" fill="#5d6d74" font-size="9.5" text-anchor="middle">embeddings</text><text x="757" y="201" fill="#5d6d74" font-size="9.5" text-anchor="middle">semantic</text><text x="992" y="201" fill="#5d6d74" font-size="9.5" text-anchor="middle">13-D</text><text x="1233" y="203" fill="#5d6d74" font-size="9.5" text-anchor="middle">z</text><text x="1454" y="203" fill="#5d6d74" font-size="9.5" text-anchor="middle">score</text>
+          <!-- inputs -->
+          <g><rect x="20" y="82" width="162" height="120" rx="6" fill="#e7f5f5" stroke="#087e86" stroke-width="1.5"/><circle cx="41" cy="107" r="5" fill="#087e86"/><text x="55" y="112" fill="#17232a" font-size="14" font-weight="700">Query q</text><text x="39" y="140" fill="#5d6d74" font-size="10.5">用户当前问题 / 指令</text><text x="39" y="166" fill="#087e86" font-size="9.5">prefix: query:</text></g>
+          <g><rect x="20" y="230" width="162" height="120" rx="6" fill="#e7f5f5" stroke="#087e86" stroke-width="1.5"/><circle cx="41" cy="255" r="5" fill="#087e86"/><text x="55" y="260" fill="#17232a" font-size="14" font-weight="700">Memory m</text><text x="39" y="288" fill="#5d6d74" font-size="10.5">候选记忆 content</text><text x="39" y="314" fill="#087e86" font-size="9.5">prefix: passage:</text></g>
+          <!-- e5 -->
+          <g><rect x="218" y="76" width="274" height="274" rx="6" fill="#f0ecfb" stroke="#6548a5" stroke-width="1.5"/><circle cx="239" cy="101" r="5" fill="#6548a5"/><text x="253" y="106" fill="#17232a" font-size="14" font-weight="700">Frozen E5 Encoder</text><text x="238" y="134" fill="#5d6d74" font-size="10.5">multilingual-e5-small</text><rect x="238" y="153" width="104" height="28" rx="4" fill="#fff" stroke="#b5a8d6"/><text x="290" y="171" fill="#6548a5" font-size="9.5" text-anchor="middle">q → q_emb</text><rect x="368" y="153" width="104" height="28" rx="4" fill="#fff" stroke="#b5a8d6"/><text x="420" y="171" fill="#6548a5" font-size="9.5" text-anchor="middle">m → m_emb</text><text x="238" y="209" fill="#5d6d74" font-size="10.5">mean pooling</text><text x="238" y="231" fill="#5d6d74" font-size="10.5">L2 normalization</text><line x1="238" y1="249" x2="472" y2="249" stroke="#c7bfda"/><text x="238" y="276" fill="#6548a5" font-size="9.5">冻结权重 · 在线不微调</text><text x="238" y="309" fill="#8b80a7" font-size="9">语义编码分支</text></g>
+          <!-- semantic -->
+          <g><rect x="530" y="132" width="210" height="166" rx="6" fill="#f0ecfb" stroke="#6548a5" stroke-width="1.5"/><text x="553" y="161" fill="#17232a" font-size="13.5" font-weight="700">Semantic Similarity</text><text x="553" y="194" fill="#5d6d74" font-size="10.5">e5_cosine</text><text x="553" y="220" fill="#6548a5" font-size="11">dot(q_emb, m_emb)</text><text x="553" y="259" fill="#8b80a7" font-size="9.5">1 个语义特征</text></g>
+          <!-- structured -->
+          <g><rect x="530" y="314" width="210" height="126" rx="6" fill="#fff6df" stroke="#966817" stroke-width="1.5"/><text x="553" y="343" fill="#17232a" font-size="13.5" font-weight="700">Feature Vector f</text><text x="553" y="370" fill="#5d6d74" font-size="10">[f₁ … f₁₂]</text><text x="553" y="393" fill="#5d6d74" font-size="10">TF-IDF / Jaccard / containment</text><text x="553" y="412" fill="#5d6d74" font-size="10">length / reference / negation / update</text><text x="553" y="431" fill="#966817" font-size="9">12 structured dimensions</text></g>
+          <!-- concat -->
+          <g><rect x="775" y="132" width="200" height="166" rx="6" fill="#eaf3fc" stroke="#275d91" stroke-width="1.5"/><text x="798" y="161" fill="#17232a" font-size="13.5" font-weight="700">Concatenate</text><text x="798" y="195" fill="#5d6d74" font-size="10.5">[e5_cosine, f₁ … f₁₂]</text><text x="798" y="224" fill="#275d91" font-size="12" font-weight="700">13-dimensional input</text><text x="798" y="259" fill="#647d95" font-size="9.5">semantic + lexical + cue</text></g>
+          <!-- scaler -->
+          <g><rect x="1010" y="132" width="205" height="166" rx="6" fill="#eaf6ef" stroke="#27734b" stroke-width="1.5"/><text x="1033" y="161" fill="#17232a" font-size="13.5" font-weight="700">StandardScaler</text><text x="1033" y="195" fill="#5d6d74" font-size="10.5">训练集均值 / 方差</text><text x="1033" y="221" fill="#5d6d74" font-size="10.5">标准化得到 z</text><text x="1033" y="259" fill="#27734b" font-size="9.5">随 ranker bundle 部署</text></g>
+          <!-- ranker -->
+          <g><rect x="1250" y="132" width="188" height="166" rx="6" fill="#eaf6ef" stroke="#27734b" stroke-width="1.5"/><text x="1273" y="161" fill="#17232a" font-size="13.5" font-weight="700">Logistic Ranker</text><text x="1273" y="195" fill="#5d6d74" font-size="10.5">score = w·z + b</text><text x="1273" y="221" fill="#5d6d74" font-size="10.5">pairwise deltas 训练</text><text x="1273" y="259" fill="#27734b" font-size="9.5">输出候选排序分数</text></g>
+          <!-- output -->
+          <g><rect x="1470" y="132" width="110" height="166" rx="6" fill="#eaf6ef" stroke="#27734b" stroke-width="1.5"/><text x="1492" y="164" fill="#17232a" font-size="13.5" font-weight="700">Top-K</text><text x="1492" y="198" fill="#5d6d74" font-size="10.5">score</text><text x="1492" y="222" fill="#5d6d74" font-size="10.5">sort</text><text x="1492" y="259" fill="#27734b" font-size="9.5">→ Assembly</text></g>
+          <!-- evidence and model boundaries -->
+          <rect x="20" y="463" width="1560" height="44" rx="5" fill="#f3f6f7" stroke="#b8c5ca"/><text x="40" y="490" fill="#17232a" font-size="10.5" font-weight="700">训练 / 验证</text><text x="142" y="490" fill="#5d6d74" font-size="10">AlpsBench public train → query 内正负样本成对差分 → Logistic Regression</text><text x="936" y="490" fill="#6548a5" font-size="10.5" font-weight="700">NDCG@10 0.5796 · Recall@1 0.4071</text><text x="1325" y="490" fill="#5d6d74" font-size="9.5">E5 baseline NDCG@10 0.5146</text>
+        </svg>
+      </div>
+    </section>
+    <section class="notes"><article class="note"><h3>模型组成</h3><p><b>1 个 e5_cosine + 12 个结构化特征 = 13 维输入</b>；E5 编码器权重冻结，不做在线微调。</p></article><article class="note"><h3>当前证据</h3><p>验证集 312 queries、30,069 candidate pairs；Hybrid NDCG@10 为 0.5796，高于 Frozen E5 的 0.5146。</p></article><article class="note"><h3>模型边界</h3><p>scope、authority、validity、egress 和 identity 仍由前置硬过滤与上下文装配负责，不由当前 ranker 学习。</p></article></section>
+    <footer class="footer"><span><b>MNEMOSYNE-MNS</b> · RANK-HYBRID-01</span><span>A4 横向 · 第 2 / 2 页 · 建议打印：实际大小 / 横向 / 开启背景图形</span></footer>
+  </section>
+</body>
+</html>

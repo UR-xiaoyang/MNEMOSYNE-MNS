@@ -62,6 +62,23 @@ class MemoryStoreTest(unittest.TestCase):
             candidates = store.search_candidates("proxy", scope_level="global", destination="local", limit=1)
             self.assertEqual([item.memory_id for item in candidates], ["valid"])
             store.close()
+    def test_project_scope_is_visible_only_to_its_project(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = MemoryStore(Path(tmp) / "memory.db")
+            project_memory = memory_from_api(
+                "project-proxy", "project proxy", destination="local", scope_level="project", project_id="p1"
+            )
+            store.upsert(project_memory)
+
+            same_project = store.search_candidates(
+                "proxy", scope_level="project", destination="local", project_id="p1"
+            )
+            other_project = store.search_candidates(
+                "proxy", scope_level="project", destination="local", project_id="p2"
+            )
+            self.assertEqual([item.memory_id for item in same_project], ["project-proxy"])
+            self.assertEqual(other_project, [])
+            store.close()
 
 
 if __name__ == "__main__":

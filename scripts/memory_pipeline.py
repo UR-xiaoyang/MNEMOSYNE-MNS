@@ -1,10 +1,17 @@
 """
 End-to-end memory retrieval and ranking pipeline for MNEMOSYNE-MNS.
 
+Supports dual recall (FTS + FAISS) for enhanced semantic matching.
+
 Usage:
     from memory_pipeline import MemoryPipeline
     
-    pipeline = MemoryPipeline(ranker_path="runs/rank_hybrid_v1")
+    pipeline = MemoryPipeline(
+        ranker_path="runs/rank_hybrid_v1",
+        enable_faiss=True,
+        faiss_index_path="deploy/faiss_index.bin",
+        e5_model_path="deploy/e5_model"
+    )
     results = pipeline.retrieve_and_rank(
         query_text="如何配置代理？",
         candidate_memories=memory_pool,
@@ -37,11 +44,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 class MemoryPipeline:
     """
     Complete memory retrieval pipeline:
-    1. Hard filters (scope, egress, validity)
-    2. Feature extraction (semantic + structured + native)
-    3. Ranking
-    4. Top-K selection
-    5. Budget-aware assembly
+    1. Dual recall (FTS + FAISS) or FTS only
+    2. Hard filters (scope, egress, validity)
+    3. Feature extraction (semantic + structured + native)
+    4. Ranking
+    5. Top-K selection
+    6. Budget-aware assembly
     """
     
     def __init__(
@@ -49,6 +57,9 @@ class MemoryPipeline:
         ranker_path: str | Path,
         device: str = "cpu",
         strict_validity: bool = False,
+        enable_faiss: bool = False,
+        faiss_index_path: str | Path | None = None,
+        e5_model_path: str | Path | None = None,
     ):
         """
         Initialize pipeline with a trained ranker.
@@ -57,9 +68,41 @@ class MemoryPipeline:
             ranker_path: Path to model directory (contains metadata.json and artifacts)
             device: "cpu" or "cuda"
             strict_validity: If True, filter out "stale" and "conflicted" memories
+            enable_faiss: Enable FAISS semantic recall (requires faiss_index_path and e5_model_path)
+            faiss_index_path: Path to FAISS index file (deploy/faiss_index.bin)
+            e5_model_path: Path to E5 model directory (deploy/e5_model)
         """
         self.ranker = RankingBaseline(resolve_model_path(ranker_path), device=device)
         self.strict_validity = strict_validity
+        self.enable_faiss = enable_faiss
+        
+        # Initialize FAISS encoder if enabled
+        self.faiss_encoder = None
+        if enable_faiss and faiss_index_path and e5_model_path:
+            # Reuse the ranker's E5 encoder if available
+            if hasattr(self.ranker, 'encoder') and hasattr(self.ranker, 'tokenizer'):
+                self.faiss_encoder = self.ranker
+            else:
+                # Create dedicated encoder for FAISS
+                import json
+
+                e5_path = Path(e5_model_path).expanduser()
+                temp_metadata_path = e5_path / "metadata.json"
+                created_metadata = False
+                
+                if not temp_metadata_path.exists():
+                    metadata = {
+                        "model_id": "MNEMOSYNE-MNS-RANK-E5-FROZEN-01",
+                        "encoder": str(e5_path),
+                    }
+                    temp_metadata_path.write_text(json.dumps(metadata, ensure_ascii=False), encoding="utf-8")
+                    created_metadata = True
+                
+                try:
+                    self.faiss_encoder = RankingBaseline(e5_path, device=device)
+                finally:
+                    if created_metadata:
+                        temp_metadata_path.unlink()
     
     def retrieve_and_rank(
         self,
@@ -71,6 +114,8 @@ class MemoryPipeline:
         requires_high_authority: bool = False,
         top_k: int = 10,
         extra_features: np.ndarray | None = None,
+        session_id: str | None = None,
+        project_id: str | None = None,
     ) -> list[dict[str, Any]]:
         """
         Retrieve and rank memories for a query.
@@ -102,7 +147,13 @@ class MemoryPipeline:
         # Step 1: Hard filters
         filtered_candidates = []
         for memory in candidate_memories:
-            if memory.hard_filter(scope_level, destination, self.strict_validity):
+            if memory.hard_filter(
+                scope_level,
+                destination,
+                self.strict_validity,
+                session_id=session_id,
+                project_id=project_id,
+            ):
                 if requires_high_authority and memory.authority.priority < 70:
                     continue
                 filtered_candidates.append(memory)
@@ -208,13 +259,14 @@ def create_pipeline(model_name: str = "hybrid") -> MemoryPipeline:
     Factory function to create pipeline with different models.
     
     Args:
-        model_name: "hybrid" | "extended" | "e5" | "tree"
+        model_name: "hybrid" | "v2" | "extended" | "e5" | "tree"
     
     Returns:
         Configured MemoryPipeline
     """
     model_paths = {
         "hybrid": "deploy/model_bundle" if (PROJECT_ROOT / "deploy/model_bundle").is_dir() else "runs/rank_hybrid_v1",
+        "v2": "deploy/rank_enhanced_v2" if (PROJECT_ROOT / "deploy/rank_enhanced_v2").is_dir() else "runs/rank_enhanced_v2",
         "extended": "runs/rank_extended_v1",
         "e5": "runs/rank_embedding_e5_v1",
         "tree": "runs/rank_pairwise_tree_v1",

@@ -58,6 +58,33 @@ class MemoryServiceTest(unittest.TestCase):
             self.assertIsNone(store.get("请记住：我偏好使用中文回复。"))
             store.close()
 
+    def test_scoped_write_requires_its_identity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = MemoryStore(Path(tmp) / "memory.db")
+            service = MemoryService(FakePipeline(), store)
+            with self.assertRaisesRegex(ValueError, "project_id"):
+                service.write("p", "project setting", scope_level="project", destination="local")
+            with self.assertRaisesRegex(ValueError, "session_id"):
+                service.write("s", "session setting", scope_level="session", destination="local")
+            store.close()
+
+    def test_project_write_preserves_project_identity_for_retrieval(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = MemoryStore(Path(tmp) / "memory.db")
+            service = MemoryService(FakePipeline(), store)
+            service.write(
+                "project-proxy", "项目代理配置", scope_level="project", destination="local", project_id="p1"
+            )
+            same = service.retrieve_store(
+                "代理", scope_level="project", destination="local", project_id="p1"
+            )
+            other = service.retrieve_store(
+                "代理", scope_level="project", destination="local", project_id="p2"
+            )
+            self.assertEqual([item["memory_id"] for item in same["assembled"]], ["project-proxy"])
+            self.assertEqual(other["assembled"], [])
+            store.close()
+
     def test_retrieve_store_accepts_context_budget(self):
         with tempfile.TemporaryDirectory() as tmp:
             store = MemoryStore(Path(tmp) / "memory.db")

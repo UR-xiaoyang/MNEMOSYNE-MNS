@@ -4,6 +4,94 @@
 
 Shadow mode runs the RANK model alongside (or instead of) the current retrieval system, collecting real `retrieved → cited → corrected` traces for production validation and continuous learning.
 
+## Export Pipeline (P2)
+
+### Building Training Data
+
+Export shadow traces to JSONL training samples with explicit authorization:
+
+```bash
+python scripts/build_shadow_training_data.py \
+  --source-db <EXPLICIT_SOURCE_DB> \
+  --output-dir <OUTPUT_DIR> \
+  --include-text  # Optional: include redacted text (default: IDs only)
+```
+
+**Privacy Boundaries:**
+- Source DB path must be explicitly provided (no default discovery)
+- Opens DB in read-only mode (`mode=ro`)
+- Output contains privacy-safe IDs only by default
+- `--include-text` flag runs redaction before including text
+- Manifest and reports contain NO absolute source paths
+- CLI stdout does not print source or output paths
+
+**Label Generation:**
+
+Every retrieval candidate generates one training sample with a label based on available evidence:
+
+- **Positive**: Citation events generate `label="positive", label_source="citation"`
+- **Corrected**: Correction events generate `label="corrected", label_source="correction"`
+- **Unknown**: Candidates without citation or feedback evidence generate `label="unknown", label_source="unknown", unknown_reason="no_citation_or_feedback_evidence"`
+
+Uncited candidates are NOT absent—they are explicitly labeled as `unknown` to preserve the candidate pool for future analysis. Unknown ≠ irrelevant; it means insufficient evidence.
+
+**Sample Schema (Required Fields):**
+- `trace_id`: Stable composite ID (hash of retrieval_event_id:memory_id:rank)
+- `retrieval_event_id`: Links to retrieval event
+- `session_id`, `turn_id`: Session context
+- `query_timestamp`, `candidate_timestamp`: Temporal ordering
+- `memory_id`: Candidate memory identifier
+- `rank`, `score`: Ranking position and model score
+- `model_id`, `scope`: Model and scope metadata
+- `injected`: Whether candidate was injected into context
+- `label`: One of "positive", "corrected", "unknown"
+- `label_source`: Evidence source ("citation", "correction", "unknown")
+- `label_confidence`: Float or None for unknown
+- `evidence_ids`: List of event IDs supporting this label
+- `sample_weight`: Training weight (0.5 for unknown, 1.0 for others)
+- `unknown_reason`: Present only when label="unknown"
+
+**Temporal Audit:**
+- Future candidates (candidate_timestamp > query_timestamp) are rejected
+- Rejections written to `rejections.jsonl` with reason codes
+- Audit manifest records rejection counts by reason
+
+**Text Redaction (--include-text):**
+- Applies secret detection to query and memory text
+- Redacted fields: `query_text_redacted`, `memory_text_redacted`
+- Records: `redaction_applied=true`, detected secret types
+- Post-export secret scan recommended before publication
+
+**Output Structure:**
+```
+training_data/
+  shadow_training_samples.jsonl  # One sample per retrieval candidate
+  rejections.jsonl                # Future candidates, invalid JSON, etc.
+  manifest.json                   # Statistics, no source paths
+```
+
+### Evaluating Quality
+
+Generate quality report from exported data:
+
+```bash
+python scripts/evaluate_shadow_traces.py \
+  --data-dir <OUTPUT_DIR> \
+  --min-samples 10 \
+  --output report.json
+```
+
+Returns `insufficient_evidence` when sample count < min-samples threshold (default 10). CLI stdout does not print output file paths.
+
+**Report Fields:**
+- `status`: `"success"` or `"insufficient_evidence"`
+- `total_samples`: Total sample count
+- `label_counts`: Distribution by label (positive, corrected, unknown)
+- `label_source_counts`: Distribution by evidence source (citation, correction, unknown)
+- `reason`: Explanation when status is insufficient_evidence
+
+When status is insufficient_evidence, do not compute percentages or make training recommendations—report honestly that more data is needed.
+
 ## Trace Event Schema
 
 ### 1. Retrieval Event

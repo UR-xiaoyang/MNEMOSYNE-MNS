@@ -63,6 +63,8 @@ class MemoryStore:
         destination: str,
         limit: int = 100,
         strict_validity: bool = True,
+        session_id: str | None = None,
+        project_id: str | None = None,
     ) -> list[MemoryEntity]:
         fetch_limit = max(limit * 10, 100)
         rows = self.connection.execute(
@@ -91,7 +93,13 @@ class MemoryStore:
             candidates = [_from_payload(json.loads(row["payload_json"])) for row in rows]
         return [
             memory for memory in candidates
-            if memory.hard_filter(scope_level, destination, strict_validity)
+            if memory.hard_filter(
+                scope_level,
+                destination,
+                strict_validity,
+                session_id=session_id,
+                project_id=project_id,
+            )
         ][:limit]
 
     def supersede(self, old_memory_id: str, replacement: MemoryEntity) -> MemoryEntity:
@@ -107,6 +115,14 @@ class MemoryStore:
         replacement.provenance.parent_memory_id = old_memory_id
         self.upsert(replacement)
         return replacement
+
+    def list_session_checkpoints(self, session_id: str) -> list[MemoryEntity]:
+        prefix = f"session:{session_id}:checkpoint:%"
+        rows = self.connection.execute(
+            "SELECT payload_json FROM memories WHERE memory_id LIKE ? ORDER BY updated_at DESC",
+            (prefix,),
+        ).fetchall()
+        return [_from_payload(json.loads(row["payload_json"])) for row in rows]
 
     def close(self) -> None:
         self.connection.close()

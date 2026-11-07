@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <title>MNEMOSYNE-MNS｜核心架构</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0a0d12;
+      --panel: #10161d;
+      --panel-soft: #131b23;
+      --line: #26323c;
+      --text: #f0f4f5;
+      --muted: #9baab2;
+      --cyan: #5bd4dc;
+      --green: #7ed6a3;
+      --violet: #b8a0f6;
+      --amber: #f2c16d;
+      --coral: #f18e83;
+      --blue: #87b7f4;
+      --font: Inter, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--bg); }
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: var(--font);
+      background:
+        radial-gradient(ellipse at 12% 0%, rgba(50, 112, 123, .13), transparent 35%),
+        radial-gradient(ellipse at 91% 12%, rgba(113, 86, 159, .11), transparent 31%),
+        var(--bg);
+      min-height: 100vh;
+    }
+    .page {
+      width: min(100% - 64px, 1600px);
+      margin: 0 auto;
+      padding: 44px 0 32px;
+    }
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #90a2aa;
+      font-size: 12px;
+      font-weight: 650;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+    }
+    .eyebrow-mark {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      background: var(--cyan);
+      box-shadow: 0 0 18px rgba(91, 212, 220, .55);
+    }
+    h1 {
+      margin: 18px 0 10px;
+      font-size: clamp(34px, 4vw, 58px);
+      line-height: 1.08;
+      font-weight: 720;
+      letter-spacing: 0;
+    }
+    h1 span { color: var(--cyan); }
+    .subtitle {
+      margin: 0;
+      color: #a7b4b9;
+      font-size: 17px;
+      line-height: 1.7;
+    }
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 9px;
+      margin: 24px 0 18px;
+    }
+    .meta {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 32px;
+      padding: 6px 11px;
+      border: 1px solid #26343d;
+      border-radius: 5px;
+      background: rgba(16, 22, 29, .74);
+      color: #b4c0c4;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .meta strong { color: var(--text); font-weight: 650; }
+    .meta-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+    .diagram-shell {
+      overflow: auto;
+      border: 1px solid #26333c;
+      border-radius: 8px;
+      background: #0c1117;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, .25);
+    }
+    svg { display: block; width: 100%; min-width: 1120px; height: auto; }
+    .notes {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 18px;
+    }
+    .note {
+      min-height: 126px;
+      padding: 17px 18px 16px;
+      border-top: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(19, 27, 35, .82), rgba(13, 18, 24, .46));
+    }
+    .note-heading {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-size: 14px;
+      font-weight: 680;
+    }
+    .note-index {
+      display: grid;
+      place-items: center;
+      width: 23px;
+      height: 23px;
+      border: 1px solid currentColor;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .note p {
+      margin: 0;
+      color: #9eacb2;
+      font-size: 13px;
+      line-height: 1.75;
+    }
+    .note.cyan { color: var(--cyan); }
+    .note.amber { color: var(--amber); }
+    .note.violet { color: var(--violet); }
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      margin-top: 19px;
+      color: #66757c;
+      font-size: 11px;
+      line-height: 1.6;
+    }
+    .footer strong { color: #9baab2; font-weight: 600; }
+    .model-section {
+      margin-top: 18px;
+      border: 1px solid #26333c;
+      border-radius: 8px;
+      background: #0c1117;
+      box-shadow: 0 20px 58px rgba(0, 0, 0, .2);
+      overflow: hidden;
+    }
+    .model-diagram { overflow: auto; }
+    .model-diagram svg { min-width: 1120px; }
+    .model-notes {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px;
+      border-top: 1px solid #26333c;
+      background: #26333c;
+    }
+    .model-note {
+      min-height: 126px;
+      padding: 16px 17px 15px;
+      background: linear-gradient(180deg, rgba(19, 27, 35, .9), rgba(13, 18, 24, .72));
+    }
+    .model-note h3 {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin: 0 0 9px;
+      color: #e8eff0;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .model-note h3::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 2px;
+      background: var(--violet);
+      box-shadow: 0 0 12px rgba(184, 160, 246, .4);
+    }
+    .model-note p {
+      margin: 0;
+      color: #9eacb2;
+      font-size: 12px;
+      line-height: 1.7;
+    }
+    .model-note strong { color: #d8d0ef; font-weight: 650; }
+    @media (max-width: 760px) {
+      .page { width: min(100% - 28px, 1600px); padding-top: 28px; }
+      .subtitle { font-size: 15px; }
+      .notes, .model-notes { grid-template-columns: 1fr; gap: 8px; background: transparent; }
+      .note, .model-note { min-height: auto; }
+      .footer { flex-direction: column; gap: 4px; }
+    }
+    @media print {
+      @page { size: landscape; margin: 9mm; }
+      html, body { background: #0a0d12 !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .page { width: 100%; padding: 0; }
+      .diagram-shell { overflow: visible; box-shadow: none; break-inside: avoid; }
+      svg { min-width: 0; }
+      .notes { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="eyebrow"><span class="eyebrow-mark"></span> MEMORY NAVIGATION &amp; SCHEDULING SYSTEM</div>
+    <h1><span>MNEMOSYNE</span>-MNS 核心架构</h1>
+    <p class="subtitle">把长期记忆变成可检索、可约束、可追踪的 Agent 上下文服务。</p>
+    <div class="meta-row" aria-label="架构摘要">
+      <span class="meta"><span class="meta-dot"></span><strong>运行时</strong> FastAPI · SQLite / FTS5</span>
+      <span class="meta"><strong>检索排序</strong> ROUTE → Hybrid RANK → Context Assembly</span>
+      <span class="meta"><strong>默认边界</strong> 本地优先 · 显式长期写入 · Shadow 可选</span>
+    </div>
+
+    <section class="diagram-shell" aria-label="MNEMOSYNE-MNS architecture diagram">
+      <svg viewBox="0 0 1600 850" role="img" aria-labelledby="diagram-title diagram-desc" xmlns="http://www.w3.org/2000/svg">
+        <title id="diagram-title">MNEMOSYNE-MNS 核心系统架构与反馈闭环</title>
+        <desc id="diagram-desc">Hermes Agent 通过 MemoryProvider 调用本地 API，经过路由、SQLite 检索、混合排序和预算装配后注入上下文。会话工作上下文与长期记忆显式写入分开，Shadow Mode 可选记录事件供离线评估和模型迭代。</desc>
+        <defs>
+          <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+            <path d="M 32 0 L 0 0 0 32" fill="none" stroke="#1c2831" stroke-width=".7"/>
+          </pattern>
+          <marker id="arrow-cyan" markerWidth="9" markerHeight="9" refX="7.2" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#5bd4dc"/></marker>
+          <marker id="arrow-green" markerWidth="9" markerHeight="9" refX="7.2" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#7ed6a3"/></marker>
+          <marker id="arrow-violet" markerWidth="9" markerHeight="9" refX="7.2" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#b8a0f6"/></marker>
+          <marker id="arrow-amber" markerWidth="9" markerHeight="9" refX="7.2" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#f2c16d"/></marker>
+          <marker id="arrow-coral" markerWidth="9" markerHeight="9" refX="7.2" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#f18e83"/></marker>
+          <marker id="arrow-muted" markerWidth="9" markerHeight="9" refX="7.2" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#84959d"/></marker>
+          <filter id="soft-glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="8"/></filter>
+        </defs>
+
+        <rect width="1600" height="850" fill="#0c1117"/>
+        <rect width="1600" height="850" fill="url(#grid)" opacity=".46"/>
+        <circle cx="1275" cy="180" r="145" fill="#6e55a7" opacity=".045" filter="url(#soft-glow)"/>
+        <circle cx="245" cy="225" r="130" fill="#348d91" opacity=".045" filter="url(#soft-glow)"/>
+
+        <!-- Runtime boundary -->
+        <rect x="34" y="40" width="1532" height="552" rx="10" fill="#0d141a" fill-opacity=".74" stroke="#33424b" stroke-width="1.4"/>
+        <rect x="55" y="57" width="8" height="8" rx="2" fill="#5bd4dc"/>
+        <text x="73" y="65" fill="#d8e1e3" font-size="13" font-weight="700" letter-spacing="1.2">01 / ONLINE RUNTIME</text>
+        <text x="1540" y="65" fill="#718189" font-size="11" text-anchor="end">本地 API 服务 · 可离线部署模型 bundle</text>
+
+        <!-- Host boundary -->
+        <rect x="55" y="91" width="365" height="468" rx="8" fill="#10191f" stroke="#37626a" stroke-width="1.2" stroke-dasharray="5 5"/>
+        <text x="75" y="117" fill="#78d6dc" font-size="11" font-weight="700" letter-spacing=".8">HOST AGENT / HERMES</text>
+        <rect x="78" y="145" width="319" height="111" rx="7" fill="#14232a" stroke="#5bd4dc" stroke-width="1.3"/>
+        <circle cx="99" cy="169" r="5" fill="#5bd4dc"/>
+        <text x="114" y="174" fill="#edf6f5" font-size="15" font-weight="700">Hermes Agent</text>
+        <text x="96" y="202" fill="#a9b8bd" font-size="12">用户请求 · 对话生成 · prompt 构建</text>
+        <text x="96" y="226" fill="#71858d" font-size="11">宿主模型由 Agent 负责，不属于 MNEMOSYNE</text>
+
+        <rect x="78" y="362" width="319" height="131" rx="7" fill="#172127" stroke="#5bd4dc" stroke-width="1.3"/>
+        <text x="98" y="389" fill="#e4f2f2" font-size="14" font-weight="700">MNEMOSYNE MemoryProvider</text>
+        <text x="98" y="416" fill="#aab9bd" font-size="11.5">异步 prefetch · 注入已准入记忆</text>
+        <text x="98" y="438" fill="#aab9bd" font-size="11.5">回合结束写入 session working context</text>
+        <text x="98" y="460" fill="#aab9bd" font-size="11.5">WRITE 仅提案；长期写入需显式提交</text>
+        <rect x="98" y="472" width="82" height="14" rx="3" fill="#25373c"/>
+        <text x="139" y="482" fill="#8cdde0" font-size="9.5" text-anchor="middle" font-weight="650">HTTP CLIENT</text>
+
+        <!-- Host lifecycle connector -->
+        <path d="M237 256 V357" fill="none" stroke="#5bd4dc" stroke-width="1.8" marker-end="url(#arrow-cyan)"/>
+        <path d="M253 362 V261" fill="none" stroke="#84959d" stroke-width="1.4" marker-end="url(#arrow-muted)"/>
+        <rect x="191" y="291" width="110" height="30" rx="4" fill="#0d141a" stroke="#30414a"/>
+        <text x="246" y="304" fill="#a9b8bd" font-size="10" text-anchor="middle">turn lifecycle</text>
+        <text x="246" y="316" fill="#71858d" font-size="9" text-anchor="middle">prefetch / inject</text>
+
+        <!-- Service boundary -->
+        <rect x="447" y="91" width="1096" height="468" rx="8" fill="#10171d" stroke="#48555d" stroke-width="1.2"/>
+        <text x="469" y="117" fill="#d3dddf" font-size="11" font-weight="700" letter-spacing=".8">MNEMOSYNE SERVICE / ASGI</text>
+        <text x="1521" y="117" fill="#718189" font-size="10" text-anchor="end">Bearer API key 可选 · /health 就绪探针公开</text>
+
+        <!-- Connectors first -->
+        <path d="M397 404 H431 V224 H469" fill="none" stroke="#5bd4dc" stroke-width="1.8" marker-end="url(#arrow-cyan)"/>
+        <text x="432" y="210" fill="#8fcdd0" font-size="9.5" text-anchor="middle">query / API call</text>
+        <path d="M469 272 H444 V430 H397" fill="none" stroke="#84959d" stroke-width="1.5" marker-end="url(#arrow-muted)"/>
+        <text x="447" y="446" fill="#9baab0" font-size="9" text-anchor="middle">context response</text>
+
+        <path d="M638 221 H675" fill="none" stroke="#7ed6a3" stroke-width="2" marker-end="url(#arrow-green)"/>
+        <text x="656" y="209" fill="#9db6a9" font-size="9" text-anchor="middle">query</text>
+        <path d="M768 279 V371" fill="none" stroke="#f2c16d" stroke-width="1.8" marker-end="url(#arrow-amber)"/>
+        <text x="783" y="329" fill="#c4aa76" font-size="9" transform="rotate(90 783 329)">candidate search</text>
+        <path d="M861 448 H892 V279 H925" fill="none" stroke="#f2c16d" stroke-width="1.8" marker-end="url(#arrow-amber)"/>
+        <text x="894" y="382" fill="#c4aa76" font-size="9" transform="rotate(-90 894 382)">filtered candidates</text>
+        <path d="M1141 236 H1190" fill="none" stroke="#b8a0f6" stroke-width="2" marker-end="url(#arrow-violet)"/>
+        <text x="1165" y="222" fill="#bdb1dc" font-size="9" text-anchor="middle">top-k</text>
+        <path d="M1310 329 V540 H552 V278" fill="none" stroke="#84959d" stroke-width="1.5" marker-end="url(#arrow-muted)"/>
+        <rect x="905" y="523" width="253" height="24" rx="4" fill="#10171d" stroke="#35434a"/>
+        <text x="1031" y="539" fill="#a8b5b9" font-size="9.5" text-anchor="middle">budgeted context → API response → Provider</text>
+
+        <!-- API -->
+        <rect x="469" y="164" width="169" height="115" rx="7" fill="#172128" stroke="#7ed6a3" stroke-width="1.4"/>
+        <circle cx="490" cy="187" r="5" fill="#7ed6a3"/>
+        <text x="505" y="192" fill="#eef5f1" font-size="14" font-weight="700">FastAPI</text>
+        <text x="487" y="219" fill="#c0cbc9" font-size="10.5">/retrieve_store</text>
+        <text x="487" y="238" fill="#91a29f" font-size="10">/memories · /route</text>
+        <text x="487" y="256" fill="#91a29f" font-size="10">/context · /shadow</text>
+
+        <!-- Route -->
+        <rect x="675" y="164" width="186" height="115" rx="7" fill="#17231e" stroke="#7ed6a3" stroke-width="1.4"/>
+        <circle cx="696" cy="187" r="5" fill="#7ed6a3"/>
+        <text x="711" y="192" fill="#eef5f1" font-size="14" font-weight="700">ROUTE</text>
+        <text x="693" y="219" fill="#c0cbc9" font-size="10.5">确定记忆路径 / authority</text>
+        <text x="693" y="238" fill="#91a29f" font-size="10">低置信度 / 历史指代信号</text>
+        <text x="693" y="256" fill="#91a29f" font-size="10">确定性规则基线，可审计</text>
+
+        <!-- Rank -->
+        <rect x="925" y="164" width="216" height="165" rx="7" fill="#1a1925" stroke="#b8a0f6" stroke-width="1.4"/>
+        <circle cx="947" cy="188" r="5" fill="#b8a0f6"/>
+        <text x="962" y="193" fill="#f0edfa" font-size="14" font-weight="700">RANK · Hybrid</text>
+        <text x="945" y="222" fill="#c4bdcf" font-size="10.5">E5 语义 + 12 维结构化特征</text>
+        <text x="945" y="242" fill="#c4bdcf" font-size="10.5">Hybrid：13 维输入 → 排序分数</text>
+        <line x1="945" y1="257" x2="1120" y2="257" stroke="#453d56"/>
+        <text x="945" y="279" fill="#bdb1dc" font-size="10">硬过滤 → 候选排序 → Top-K</text>
+        <text x="945" y="304" fill="#8b819d" font-size="9.5">版本化 ranker · CPU 推理</text>
+
+        <!-- Assembly -->
+        <rect x="1190" y="164" width="311" height="165" rx="7" fill="#1b1c1c" stroke="#f2c16d" stroke-width="1.4"/>
+        <circle cx="1212" cy="188" r="5" fill="#f2c16d"/>
+        <text x="1227" y="193" fill="#f8f1e5" font-size="14" font-weight="700">Context Assembly</text>
+        <text x="1210" y="222" fill="#c9c2b3" font-size="10.5">有效性 / 冲突链过滤</text>
+        <text x="1210" y="242" fill="#c9c2b3" font-size="10.5">近重复去重 · Token 预算准入</text>
+        <line x1="1210" y1="257" x2="1480" y2="257" stroke="#514938"/>
+        <text x="1210" y="280" fill="#dbc38d" font-size="10">仅注入 admitted memories</text>
+        <text x="1210" y="304" fill="#968969" font-size="9.5">结果携带 rank / score / metadata</text>
+
+        <!-- Persistent memory store -->
+        <rect x="675" y="371" width="186" height="154" rx="7" fill="#211d16" stroke="#f2c16d" stroke-width="1.4"/>
+        <path d="M696 394 C696 389 707 385 719 385 C731 385 742 389 742 394 C742 399 731 403 719 403 C707 403 696 399 696 394 Z" fill="none" stroke="#f2c16d" stroke-width="1.4"/>
+        <path d="M696 394 V414 C696 419 707 423 719 423 C731 423 742 419 742 414 V394 M696 404 C696 409 707 413 719 413 C731 413 742 409 742 404" fill="none" stroke="#f2c16d" stroke-width="1.2"/>
+        <text x="752" y="399" fill="#f8f1e5" font-size="13" font-weight="700">MemoryStore</text>
+        <text x="694" y="446" fill="#c9c2b3" font-size="10.5">SQLite · memory.db</text>
+        <text x="694" y="466" fill="#c9c2b3" font-size="10.5">FTS5 / substring fallback</text>
+        <text x="694" y="486" fill="#c9c2b3" font-size="10">scope · project · session</text>
+        <text x="694" y="505" fill="#c9c2b3" font-size="10">egress · validity · identity</text>
+
+        <!-- Explicit write branch -->
+        <path d="M553 279 V371" fill="none" stroke="#f18e83" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow-coral)"/>
+        <rect x="469" y="371" width="169" height="154" rx="7" fill="#211918" stroke="#f18e83" stroke-width="1.2"/>
+        <circle cx="490" cy="394" r="5" fill="#f18e83"/>
+        <text x="505" y="399" fill="#f8eeec" font-size="13" font-weight="700">WRITE / UPDATE</text>
+        <text x="487" y="429" fill="#cbb9b5" font-size="10">/write_proposals</text>
+        <text x="487" y="448" fill="#f2a39a" font-size="10" font-weight="650">只返回提案，不落库</text>
+        <text x="487" y="474" fill="#cbb9b5" font-size="10">/memories 显式写入</text>
+        <text x="487" y="493" fill="#cbb9b5" font-size="10">/supersede 显式替换</text>
+        <text x="487" y="513" fill="#8f7773" font-size="9">长期记忆变更必须显式提交</text>
+        <path d="M638 449 H669" fill="none" stroke="#f18e83" stroke-width="1.6" marker-end="url(#arrow-coral)"/>
+
+        <!-- Session context and checkpoint annotation -->
+        <rect x="925" y="371" width="216" height="115" rx="7" fill="#142022" stroke="#5bd4dc" stroke-width="1.15"/>
+        <text x="945" y="396" fill="#dff3f1" font-size="12.5" font-weight="700">SESSION CONTEXT</text>
+        <text x="945" y="420" fill="#aabbbc" font-size="10">/context/turn · /checkpoint</text>
+        <text x="945" y="440" fill="#aabbbc" font-size="10">幂等写入 · 同 session 可召回</text>
+        <text x="945" y="460" fill="#aabbbc" font-size="10">不自动提升到 project / global</text>
+        <path d="M925 455 H905 V503 H868" fill="none" stroke="#5bd4dc" stroke-width="1.4" marker-end="url(#arrow-cyan)"/>
+
+        <!-- Shadow mode -->
+        <rect x="1190" y="371" width="311" height="154" rx="7" fill="#201a1b" stroke="#f18e83" stroke-width="1.2" stroke-dasharray="5 4"/>
+        <text x="1210" y="396" fill="#f4e8e6" font-size="12.5" font-weight="700">SHADOW MODE · OPTIONAL</text>
+        <rect x="1400" y="380" width="79" height="19" rx="4" fill="#392526"/>
+        <text x="1439" y="393" fill="#f3a59c" font-size="9" font-weight="700" text-anchor="middle">DEFAULT OFF</text>
+        <text x="1210" y="424" fill="#c8b7b4" font-size="10">retrieval · citation · ignored · correction</text>
+        <text x="1210" y="445" fill="#c8b7b4" font-size="10">本地 trace：shadow_traces.db</text>
+        <text x="1210" y="466" fill="#c8b7b4" font-size="10">指标与回放，用于评估检索是否有用</text>
+        <text x="1210" y="498" fill="#9a817d" font-size="9.5">不改变在线记忆；未启用时不写 trace</text>
+        <path d="M1346 329 V359 H1340 V366" fill="none" stroke="#f18e83" stroke-width="1.25" stroke-dasharray="4 4" marker-end="url(#arrow-coral)"/>
+
+        <!-- Feedback / model lifecycle -->
+        <rect x="34" y="620" width="1532" height="196" rx="10" fill="#0d141a" fill-opacity=".82" stroke="#33424b" stroke-width="1.2"/>
+        <rect x="55" y="637" width="8" height="8" rx="2" fill="#b8a0f6"/>
+        <text x="73" y="645" fill="#d8e1e3" font-size="13" font-weight="700" letter-spacing="1.2">02 / OBSERVABILITY &amp; MODEL LIFECYCLE</text>
+        <text x="1540" y="645" fill="#718189" font-size="10.5" text-anchor="end">离线评估与模型发布是独立流程，不是在线自动自训练</text>
+
+        <!-- Feedback arrows behind nodes -->
+        <path d="M1345 525 V590 H220 V698" fill="none" stroke="#f18e83" stroke-width="1.35" stroke-dasharray="5 5" marker-end="url(#arrow-coral)"/>
+        <text x="600" y="584" fill="#c18f8a" font-size="9.5" text-anchor="middle">opt-in traces / shadow metrics</text>
+        <path d="M485 748 H567" fill="none" stroke="#84959d" stroke-width="1.6" marker-end="url(#arrow-muted)"/>
+        <path d="M947 748 H1028" fill="none" stroke="#b8a0f6" stroke-width="1.8" marker-end="url(#arrow-violet)"/>
+        <path d="M1185 696 V675 H1033 V334" fill="none" stroke="#b8a0f6" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow-violet)"/>
+        <text x="1107" y="669" fill="#b9a9df" font-size="9" text-anchor="middle">versioned bundle / deploy</text>
+
+        <!-- Lifecycle cards -->
+        <rect x="75" y="696" width="410" height="100" rx="7" fill="#201a1b" stroke="#f18e83" stroke-width="1.1"/>
+        <circle cx="96" cy="718" r="5" fill="#f18e83"/>
+        <text x="111" y="723" fill="#f4e9e7" font-size="13" font-weight="700">本地观测数据</text>
+        <text x="96" y="751" fill="#c8b7b4" font-size="10.5">Shadow trace · retrieval / citation / correction</text>
+        <text x="96" y="774" fill="#9b8581" font-size="9.5">默认关闭 · 数据按本地配置保留</text>
+
+        <rect x="567" y="696" width="380" height="100" rx="7" fill="#171d24" stroke="#84959d" stroke-width="1.1"/>
+        <circle cx="588" cy="718" r="5" fill="#84959d"/>
+        <text x="603" y="723" fill="#edf1f2" font-size="13" font-weight="700">离线评估与训练</text>
+        <text x="588" y="751" fill="#b5c0c3" font-size="10.5">数据验证 · 排序评估 · 训练 / 对比</text>
+        <text x="588" y="774" fill="#849198" font-size="9.5">产出经过评估的候选模型，不直接改线上</text>
+
+        <rect x="1028" y="696" width="313" height="100" rx="7" fill="#1b1925" stroke="#b8a0f6" stroke-width="1.1"/>
+        <circle cx="1049" cy="718" r="5" fill="#b8a0f6"/>
+        <text x="1064" y="723" fill="#f0edfa" font-size="13" font-weight="700">版本化 RANK bundle</text>
+        <text x="1049" y="751" fill="#c4bdcf" font-size="10.5">Hybrid ranker · E5 / 特征工件</text>
+        <text x="1049" y="774" fill="#9188a0" font-size="9.5">显式部署后进入在线评分路径</text>
+
+        <rect x="1380" y="696" width="145" height="100" rx="7" fill="#14231f" stroke="#7ed6a3" stroke-width="1.1"/>
+        <text x="1452" y="723" fill="#e9f4ed" font-size="12" font-weight="700" text-anchor="middle">在线服务</text>
+        <text x="1452" y="749" fill="#b4c4bb" font-size="10" text-anchor="middle">RANK scoring</text>
+        <text x="1452" y="774" fill="#8aa294" font-size="9.5" text-anchor="middle">CPU · local-first</text>
+      </svg>
+    </section>
+
+    <section class="model-section" aria-label="RANK 模型内部架构">
+      <div class="model-diagram">
+        <svg viewBox="0 0 1600 690" role="img" aria-labelledby="model-title model-desc" xmlns="http://www.w3.org/2000/svg">
+          <title id="model-title">MNEMOSYNE-MNS-RANK-HYBRID-01 模型内部架构</title>
+          <desc id="model-desc">查询和候选记忆分别进入冻结的 E5 编码器，经过 mean pooling 和 L2 normalization 计算语义余弦相似度；同时计算 12 个结构化特征。13 维向量经过 StandardScaler 和成对训练的 Logistic Regression 输出排序分数。</desc>
+          <defs>
+            <pattern id="model-grid" width="32" height="32" patternUnits="userSpaceOnUse">
+              <path d="M 32 0 L 0 0 0 32" fill="none" stroke="#1c2831" stroke-width=".7"/>
+            </pattern>
+            <marker id="model-arrow-cyan" markerWidth="9" markerHeight="9" refX="7.2" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#5bd4dc"/></marker>
+            <marker id="model-arrow-violet" markerWidth="9" markerHeight="9" refX="7.2" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#b8a0f6"/></marker>
+            <marker id="model-arrow-amber" markerWidth="9" markerHeight="9" refX="7.2" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#f2c16d"/></marker>
+            <marker id="model-arrow-green" markerWidth="9" markerHeight="9" refX="7.2" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#7ed6a3"/></marker>
+          </defs>
+          <rect width="1600" height="690" fill="#0c1117"/>
+          <rect width="1600" height="690" fill="url(#model-grid)" opacity=".46"/>
+
+          <!-- Header -->
+          <rect x="34" y="35" width="8" height="8" rx="2" fill="#b8a0f6"/>
+          <text x="55" y="43" fill="#d8e1e3" font-size="13" font-weight="700" letter-spacing="1.2">03 / MODEL ARCHITECTURE</text>
+          <text x="1548" y="43" fill="#b8a0f6" font-size="11" font-weight="700" text-anchor="end">MNEMOSYNE-MNS-RANK-HYBRID-01 · RECOMMENDED</text>
+          <text x="55" y="77" fill="#9baab2" font-size="12">冻结语义编码器 + 结构化特征 + 成对排序器</text>
+
+          <!-- Upstream hard filters -->
+          <rect x="34" y="94" width="1532" height="43" rx="6" fill="#131b22" stroke="#46545c" stroke-width="1"/>
+          <text x="55" y="121" fill="#d8e0e2" font-size="11" font-weight="650">模型前置硬过滤</text>
+          <text x="190" y="121" fill="#9faeb3" font-size="11">scope · egress · validity · session/project identity · authority gate</text>
+          <text x="1537" y="121" fill="#718189" font-size="10" text-anchor="end">这些不是学习参数，由规则与 MemoryStore 负责</text>
+
+          <!-- Connectors behind the nodes -->
+          <path d="M257 207 H305" fill="none" stroke="#5bd4dc" stroke-width="1.8" marker-end="url(#model-arrow-cyan)"/>
+          <path d="M257 323 H305" fill="none" stroke="#5bd4dc" stroke-width="1.8" marker-end="url(#model-arrow-cyan)"/>
+          <path d="M575 258 H636" fill="none" stroke="#b8a0f6" stroke-width="1.8" marker-end="url(#model-arrow-violet)"/>
+          <path d="M575 490 H636" fill="none" stroke="#f2c16d" stroke-width="1.8" marker-end="url(#model-arrow-amber)"/>
+          <path d="M257 207 H282 V480 H305" fill="none" stroke="#f2c16d" stroke-width="1.35" stroke-dasharray="5 4" marker-end="url(#model-arrow-amber)"/>
+          <path d="M257 323 H270 V480 H305" fill="none" stroke="#f2c16d" stroke-width="1.35" stroke-dasharray="5 4" marker-end="url(#model-arrow-amber)"/>
+          <path d="M856 232 H906 V296 H945" fill="none" stroke="#b8a0f6" stroke-width="1.8" marker-end="url(#model-arrow-violet)"/>
+          <path d="M856 480 H906 V355 H945" fill="none" stroke="#f2c16d" stroke-width="1.8" marker-end="url(#model-arrow-amber)"/>
+          <path d="M1150 327 H1190" fill="none" stroke="#b8a0f6" stroke-width="2" marker-end="url(#model-arrow-violet)"/>
+          <path d="M1360 327 H1392" fill="none" stroke="#7ed6a3" stroke-width="2" marker-end="url(#model-arrow-green)"/>
+          <path d="M1517 390 V493" fill="none" stroke="#7ed6a3" stroke-width="1.8" marker-end="url(#model-arrow-green)"/>
+
+          <!-- Inputs -->
+          <rect x="55" y="165" width="202" height="86" rx="7" fill="#14262b" stroke="#5bd4dc" stroke-width="1.3"/>
+          <circle cx="76" cy="189" r="5" fill="#5bd4dc"/>
+          <text x="91" y="194" fill="#e8f4f3" font-size="14" font-weight="700">Query q</text>
+          <text x="76" y="218" fill="#b1c1c4" font-size="10.5">用户当前问题 / 指令</text>
+          <text x="76" y="237" fill="#82cdd0" font-size="10">prefix: query:</text>
+
+          <rect x="55" y="281" width="202" height="86" rx="7" fill="#14262b" stroke="#5bd4dc" stroke-width="1.3"/>
+          <circle cx="76" cy="305" r="5" fill="#5bd4dc"/>
+          <text x="91" y="310" fill="#e8f4f3" font-size="14" font-weight="700">Memory m</text>
+          <text x="76" y="334" fill="#b1c1c4" font-size="10.5">候选记忆实体 content</text>
+          <text x="76" y="353" fill="#82cdd0" font-size="10">prefix: passage:</text>
+
+          <!-- E5 -->
+          <rect x="305" y="160" width="270" height="207" rx="8" fill="#1b1925" stroke="#b8a0f6" stroke-width="1.4"/>
+          <circle cx="328" cy="185" r="5" fill="#b8a0f6"/>
+          <text x="343" y="190" fill="#f0edfa" font-size="14" font-weight="700">Frozen E5 Encoder</text>
+          <text x="325" y="215" fill="#c9c1d9" font-size="10.5">intfloat/multilingual-e5-small</text>
+          <rect x="325" y="231" width="104" height="27" rx="4" fill="#2b2540" stroke="#564a78"/>
+          <text x="377" y="248" fill="#d4c9f0" font-size="9.5" text-anchor="middle">query → q_emb</text>
+          <rect x="451" y="231" width="104" height="27" rx="4" fill="#2b2540" stroke="#564a78"/>
+          <text x="503" y="248" fill="#d4c9f0" font-size="9.5" text-anchor="middle">passage → m_emb</text>
+          <text x="325" y="282" fill="#c9c1d9" font-size="10.5">mean pooling</text>
+          <text x="325" y="302" fill="#c9c1d9" font-size="10.5">L2 normalization</text>
+          <line x1="325" y1="316" x2="555" y2="316" stroke="#4a405f"/>
+          <text x="325" y="340" fill="#9d92b4" font-size="9.5">冻结权重 · 不在在线服务中微调</text>
+
+          <!-- Semantic score -->
+          <rect x="636" y="177" width="220" height="111" rx="8" fill="#211d2d" stroke="#b8a0f6" stroke-width="1.3"/>
+          <text x="658" y="203" fill="#f0edfa" font-size="13" font-weight="700">Semantic Similarity</text>
+          <text x="658" y="231" fill="#c9c1d9" font-size="10.5">e5_cosine</text>
+          <text x="658" y="253" fill="#b8a0f6" font-size="11">dot(q_emb, m_emb)</text>
+          <text x="658" y="273" fill="#8f84a2" font-size="9.5">1 个语义特征</text>
+
+          <!-- Structured feature block -->
+          <rect x="305" y="413" width="270" height="154" rx="8" fill="#211d16" stroke="#f2c16d" stroke-width="1.3"/>
+          <circle cx="328" cy="438" r="5" fill="#f2c16d"/>
+          <text x="343" y="443" fill="#f8f1e5" font-size="13.5" font-weight="700">12 Structured Features</text>
+          <text x="325" y="469" fill="#d1c29f" font-size="10">TF-IDF cosine · lexical Jaccard</text>
+          <text x="325" y="487" fill="#d1c29f" font-size="10">lexical containment · length logs</text>
+          <text x="325" y="505" fill="#d1c29f" font-size="10">reference · negation · update cues</text>
+          <text x="325" y="523" fill="#d1c29f" font-size="10">same_source_public · weak_proxy</text>
+          <text x="325" y="541" fill="#d1c29f" font-size="10">sample_weight</text>
+          <text x="325" y="558" fill="#9e8960" font-size="9">精确列顺序由 feature contract 固定</text>
+
+          <!-- Feature vector -->
+          <rect x="636" y="423" width="220" height="111" rx="8" fill="#211d16" stroke="#f2c16d" stroke-width="1.3"/>
+          <text x="658" y="450" fill="#f8f1e5" font-size="13" font-weight="700">Feature Vector f</text>
+          <text x="658" y="478" fill="#d1c29f" font-size="10.5">[ f₁, f₂, …, f₁₂ ]</text>
+          <text x="658" y="501" fill="#f2c16d" font-size="11">12 structured dimensions</text>
+          <text x="658" y="521" fill="#9e8960" font-size="9.5">query / memory pair 对齐计算</text>
+
+          <!-- Concatenate -->
+          <rect x="945" y="260" width="205" height="135" rx="8" fill="#18212a" stroke="#87b7f4" stroke-width="1.35"/>
+          <circle cx="967" cy="285" r="5" fill="#87b7f4"/>
+          <text x="982" y="290" fill="#e8f1fb" font-size="13.5" font-weight="700">Concatenate</text>
+          <text x="965" y="320" fill="#b7c9dc" font-size="10.5">[ e5_cosine, f₁ … f₁₂ ]</text>
+          <text x="965" y="345" fill="#87b7f4" font-size="12" font-weight="650">13-dimensional input</text>
+          <text x="965" y="373" fill="#879bad" font-size="9.5">semantic + lexical + cue signals</text>
+
+          <!-- Scaler -->
+          <rect x="1190" y="260" width="170" height="135" rx="8" fill="#15231f" stroke="#7ed6a3" stroke-width="1.35"/>
+          <text x="1212" y="290" fill="#e9f4ed" font-size="13.5" font-weight="700">StandardScaler</text>
+          <text x="1212" y="321" fill="#b4c4bb" font-size="10.5">训练集统计量</text>
+          <text x="1212" y="344" fill="#b4c4bb" font-size="10.5">均值 / 方差标准化</text>
+          <text x="1212" y="373" fill="#8aa294" font-size="9.5">与 ranker bundle 一起部署</text>
+
+          <!-- Ranker -->
+          <rect x="1392" y="247" width="125" height="143" rx="8" fill="#17231e" stroke="#7ed6a3" stroke-width="1.45"/>
+          <text x="1454" y="274" fill="#e9f4ed" font-size="13" font-weight="700" text-anchor="middle">Logistic</text>
+          <text x="1454" y="293" fill="#e9f4ed" font-size="13" font-weight="700" text-anchor="middle">Ranker</text>
+          <line x1="1412" y1="307" x2="1497" y2="307" stroke="#3c5f4b"/>
+          <text x="1454" y="330" fill="#b4c4bb" font-size="10" text-anchor="middle">score = w·z + b</text>
+          <text x="1454" y="355" fill="#8aa294" font-size="9.5" text-anchor="middle">pairwise deltas</text>
+          <text x="1454" y="373" fill="#8aa294" font-size="9.5" text-anchor="middle">训练目标</text>
+
+          <!-- Output -->
+          <rect x="1392" y="493" width="125" height="74" rx="8" fill="#14231f" stroke="#7ed6a3" stroke-width="1.3"/>
+          <text x="1454" y="521" fill="#e9f4ed" font-size="13" font-weight="700" text-anchor="middle">Ranking Score</text>
+          <text x="1454" y="546" fill="#b4c4bb" font-size="10" text-anchor="middle">→ sort → Top-K</text>
+
+          <!-- Bottom technical strip -->
+          <rect x="55" y="609" width="1462" height="42" rx="6" fill="#131b22" stroke="#33434b"/>
+          <text x="76" y="635" fill="#d2dcde" font-size="10.5" font-weight="650">训练 / 验证</text>
+          <text x="175" y="635" fill="#a8b5b9" font-size="10.5">AlpsBench public train → query 内正负样本成对差分 → Logistic Regression</text>
+          <text x="1510" y="635" fill="#b8a0f6" font-size="10.5" text-anchor="end">NDCG@10 0.5796 · Recall@1 0.4071</text>
+        </svg>
+      </div>
+      <div class="model-notes">
+        <article class="model-note">
+          <h3>当前在线模型</h3>
+          <p><strong>Hybrid E5 + features</strong> 是当前推荐 RANK baseline；E5 权重冻结，线上只做编码、特征计算和打分。</p>
+        </article>
+        <article class="model-note">
+          <h3>为什么不是单一向量检索</h3>
+          <p>E5 捕捉语义相似度；TF-IDF、词项重合、指代/否定/更新 cue 补足精确匹配和上下文信号。</p>
+        </article>
+        <article class="model-note">
+          <h3>训练证据</h3>
+          <p>验证集为 312 queries、30,069 candidate pairs；Hybrid 的 <strong>NDCG@10 = 0.5796</strong>，优于 Frozen E5 的 0.5146。</p>
+        </article>
+        <article class="model-note">
+          <h3>模型边界</h3>
+          <p>scope、authority、validity、egress、version 等系统约束仍由前置硬过滤和上下文装配负责，不由当前 Hybrid 学习。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="notes" aria-label="架构说明">
+      <article class="note cyan">
+        <div class="note-heading"><span class="note-index">01</span>在线检索链路</div>
+        <p>ROUTE 给出路径与权限信号；MemoryStore 先按 scope、身份、egress 和有效性筛选，再由 Hybrid RANK 排序，最后按冲突、重复和 token 预算装配上下文。</p>
+      </article>
+      <article class="note amber">
+        <div class="note-heading"><span class="note-index">02</span>持久化与写入边界</div>
+        <p>记忆实体和 FTS 索引保存在本地 SQLite。对话回合只形成 session 工作上下文；长期记忆的新增或替换必须通过显式 API，提案接口不会自动提交。</p>
+      </article>
+      <article class="note violet">
+        <div class="note-heading"><span class="note-index">03</span>可观测与模型迭代</div>
+        <p>Shadow Mode 默认关闭且仅本地记录。trace 可用于离线回放、评估和训练；候选 ranker 经版本化后显式部署，不存在在线自动训练或自动晋升。</p>
+      </article>
+    </section>
+
+    <footer class="footer">
+      <span><strong>MNEMOSYNE-MNS</strong> · Memory Navigation &amp; Scheduling System</span>
+      <span>核心架构展示稿 · 单文件 HTML · 无外部资源依赖</span>
+    </footer>
+  </main>
+</body>
+</html>

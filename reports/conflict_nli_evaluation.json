@@ -1,0 +1,24 @@
+{
+  "timestamp": 1793850183.8818038,
+  "test_cases": 40,
+  "nli": {
+    "correct": 32,
+    "accuracy": 0.8,
+    "avg_latency_ms": 132.0018950063968,
+    "max_latency_ms": 280.5357000324875
+  },
+  "baseline": {
+    "correct": 22,
+    "accuracy": 0.55
+  },
+  "improvement": {
+    "absolute": 0.25,
+    "relative_percent": 25.0
+  },
+  "requirements": {
+    "latency_target_ms": 50,
+    "latency_met": false,
+    "accuracy_improvement_target_percent": 10,
+    "accuracy_improvement_met": true
+  }
+}
