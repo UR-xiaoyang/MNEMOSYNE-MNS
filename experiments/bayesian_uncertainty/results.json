@@ -1,0 +1,19 @@
+{
+  "experiment": "bayesian_uncertainty_modeling",
+  "dataset": "data/shadow_export",
+  "n_traces": 10418,
+  "scipy_available": true,
+  "pymc_available": false,
+  "conclusion": "Bayesian methods provide uncertainty quantification for memory quality",
+  "benefits": [
+    "Small data friendly (priors handle sparse data)",
+    "Uncertainty quantification (credible intervals)",
+    "Natural correction handling (Bayesian updates)",
+    "Interpretable (probability of quality > threshold)"
+  ],
+  "next_steps": [
+    "Integrate uncertainty into RANK features",
+    "Use credible intervals for AUDIT alerts",
+    "Explore hierarchical models for memory clustering"
+  ]
+}
