@@ -52,6 +52,18 @@ def load_shadow_traces(data_dir: str) -> List[dict]:
     
     return traces
 
+def load_synthetic_retrieval_history(data_path: str) -> List[dict]:
+    """Load synthetic retrieval history (aggregated format)."""
+    if not Path(data_path).exists():
+        raise FileNotFoundError(f"Synthetic data not found: {data_path}")
+    
+    memories = []
+    with open(data_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            memories.append(json.loads(line))
+    
+    return memories
+
 class BetaBernoulliMemoryQuality:
     """
     Simple Bayesian model for memory quality using Beta-Bernoulli conjugacy.
@@ -314,35 +326,60 @@ def experiment_uncertainty_guided_ranking():
     print("  λ = uncertainty penalty (e.g., λ=1.0)")
     print("  → A > C > B (memory B penalized for uncertainty)")
 
-def run_experiment(data_dir: str = "data/shadow_export"):
+def run_experiment(data_dir: str = "data/shadow_export", use_synthetic: bool = False):
     """Run full Bayesian uncertainty experiment."""
     
     print("="*60)
     print("Bayesian Uncertainty Modeling Experiment")
     print("="*60)
     
-    # Load shadow traces
-    print(f"\n1. Loading shadow trace data from {data_dir}...")
-    try:
-        traces = load_shadow_traces(data_dir)
-        print(f"   ✓ Loaded {len(traces)} shadow trace events")
-    except FileNotFoundError as e:
-        print(f"   ❌ {e}")
-        print("\nPlease ensure shadow data exists:")
-        print("  python scripts/export_shadow_data.py")
-        return
-    
-    # Experiment 1: Frequentist vs Bayesian
-    if SCIPY_AVAILABLE:
-        compare_frequentist_vs_bayesian(traces)
+    if use_synthetic:
+        # Load synthetic retrieval history (aggregated format)
+        synthetic_path = "data/synthetic_retrieval/retrieval_history.jsonl"
+        print(f"\n1. Loading synthetic retrieval history from {synthetic_path}...")
+        try:
+            memories = load_synthetic_retrieval_history(synthetic_path)
+            print(f"   ✓ Loaded {len(memories)} memories with retrieval history")
+            
+            # Filter memories with sufficient data
+            qualified_memories = [m for m in memories if m['n_retrievals'] >= 5]
+            print(f"   ✓ {len(qualified_memories)} memories with ≥5 retrievals")
+            
+            # Run Bayesian analysis on synthetic data
+            if SCIPY_AVAILABLE and len(qualified_memories) > 0:
+                run_synthetic_analysis(qualified_memories)
+            else:
+                print("\n⚠️  Skipping analysis (scipy not available or no qualified memories)")
+                
+        except FileNotFoundError as e:
+            print(f"   ❌ {e}")
+            print("\nPlease generate synthetic data first:")
+            print("  python scripts/generate_synthetic_retrieval_history.py")
+            return
     else:
-        print("\n⚠️  Skipping Frequentist vs Bayesian (scipy not available)")
-    
-    # Experiment 2: Uncertainty-guided ranking
-    if SCIPY_AVAILABLE:
-        experiment_uncertainty_guided_ranking()
-    else:
-        print("\n⚠️  Skipping uncertainty-guided ranking (scipy not available)")
+        # Original shadow trace path
+        # Load shadow traces
+        print(f"\n1. Loading shadow trace data from {data_dir}...")
+        try:
+            traces = load_shadow_traces(data_dir)
+            print(f"   ✓ Loaded {len(traces)} shadow trace events")
+        except FileNotFoundError as e:
+            print(f"   ❌ {e}")
+            print("\nPlease ensure shadow data exists:")
+            print("  python scripts/export_shadow_data.py")
+            return
+        
+        # Experiment 1: Frequentist vs Bayesian
+        if SCIPY_AVAILABLE:
+            compare_frequentist_vs_bayesian(traces)
+        else:
+            print("\n⚠️  Skipping Frequentist vs Bayesian (scipy not available)")
+        
+        # Experiment 2: Uncertainty-guided ranking
+        if SCIPY_AVAILABLE:
+            experiment_uncertainty_guided_ranking()
+        else:
+            print("\n⚠️  Skipping uncertainty-guided ranking (scipy not available)")
     
     # Experiment 3: Hierarchical model (optional, slow)
     if PYMC_AVAILABLE:
@@ -358,8 +395,7 @@ def run_experiment(data_dir: str = "data/shadow_export"):
     
     results = {
         "experiment": "bayesian_uncertainty_modeling",
-        "dataset": data_dir,
-        "n_traces": len(traces),
+        "dataset": "synthetic" if use_synthetic else data_dir,
         "scipy_available": SCIPY_AVAILABLE,
         "pymc_available": PYMC_AVAILABLE,
         "conclusion": "Bayesian methods provide uncertainty quantification for memory quality",
@@ -396,24 +432,98 @@ def run_experiment(data_dir: str = "data/shadow_export"):
     print("  2. Use credible intervals for AUDIT risk scoring")
     print("  3. Deploy uncertainty-guided memory selection in ASSEMBLE")
 
+def run_synthetic_analysis(memories: List[dict]):
+    """Run Bayesian analysis on synthetic retrieval history."""
+    
+    print("\n" + "="*60)
+    print("Bayesian Analysis on Synthetic Data")
+    print("="*60)
+    
+    bayesian_model = BetaBernoulliMemoryQuality(alpha_prior=1.0, beta_prior=1.0)
+    
+    # Analyze top 10 memories by retrieval count
+    top_memories = sorted(memories, key=lambda m: m['n_retrievals'], reverse=True)[:10]
+    
+    print("\n{:<15} {:<10} {:<10} {:<20} {:<15}".format(
+        "Memory ID", "Retrievals", "Citations", "Bayesian Quality", "Uncertainty"
+    ))
+    print("-" * 80)
+    
+    for mem in top_memories:
+        posterior = bayesian_model.fit_memory(
+            mem['n_retrievals'], 
+            mem['n_citations']
+        )
+        
+        print("{:<15} {:<10} {:<10} {:.3f} (CI: {:.2f}-{:.2f})  {:.3f}".format(
+            mem['memory_id'][:12],
+            mem['n_retrievals'],
+            mem['n_citations'],
+            posterior["posterior_mean"],
+            posterior["credible_interval_95"][0],
+            posterior["credible_interval_95"][1],
+            posterior["posterior_std"]
+        ))
+    
+    # Compare sparse vs rich data
+    print("\n" + "="*60)
+    print("Uncertainty Comparison: Sparse vs Rich Data")
+    print("="*60)
+    
+    sparse_memories = [m for m in memories if 5 <= m['n_retrievals'] < 10]
+    rich_memories = [m for m in memories if m['n_retrievals'] >= 50]
+    
+    if sparse_memories and rich_memories:
+        sparse_sample = sparse_memories[0]
+        rich_sample = rich_memories[0]
+        
+        sparse_post = bayesian_model.fit_memory(
+            sparse_sample['n_retrievals'],
+            sparse_sample['n_citations']
+        )
+        rich_post = bayesian_model.fit_memory(
+            rich_sample['n_retrievals'],
+            rich_sample['n_citations']
+        )
+        
+        print(f"\nSparse data (n={sparse_sample['n_retrievals']}):")
+        print(f"  Quality: {sparse_post['posterior_mean']:.3f} ± {sparse_post['posterior_std']:.3f}")
+        print(f"  95% CI: [{sparse_post['credible_interval_95'][0]:.2f}, {sparse_post['credible_interval_95'][1]:.2f}]")
+        print(f"  Uncertainty: HIGH (wide credible interval)")
+        
+        print(f"\nRich data (n={rich_sample['n_retrievals']}):")
+        print(f"  Quality: {rich_post['posterior_mean']:.3f} ± {rich_post['posterior_std']:.3f}")
+        print(f"  95% CI: [{rich_post['credible_interval_95'][0]:.2f}, {rich_post['credible_interval_95'][1]:.2f}]")
+        print(f"  Uncertainty: LOW (narrow credible interval)")
+        
+        print(f"\nKey insight: More data → lower uncertainty (narrower CI)")
+    
+    print("\n" + "="*60)
+
 if __name__ == "__main__":
     import sys
     
-    # Check if shadow data exists
-    data_dir = "data/shadow_export"
-    if not Path(data_dir).exists():
-        print(f"❌ Shadow data not found: {data_dir}")
-        print("\nPlease export shadow data first:")
-        print("  # Option 1: Use existing export script")
-        print("  python scripts/export_shadow_data.py")
-        print()
-        print("  # Option 2: Create mock data for testing")
-        print("  mkdir -p data/shadow_export")
-        print("  echo '{\"memory_id\":\"test\",\"event_type\":\"retrieve\",\"label\":\"citation\"}' > data/shadow_export/shadow_training_samples.jsonl")
-        sys.exit(1)
+    # Check for synthetic flag
+    use_synthetic = "--synthetic" in sys.argv
     
-    # Run experiment
-    run_experiment(data_dir)
+    if use_synthetic:
+        # Run with synthetic data
+        run_experiment(use_synthetic=True)
+    else:
+        # Check if shadow data exists
+        data_dir = "data/shadow_export"
+        if not Path(data_dir).exists():
+            print(f"❌ Shadow data not found: {data_dir}")
+            print("\nPlease export shadow data first:")
+            print("  # Option 1: Use existing export script")
+            print("  python scripts/export_shadow_data.py")
+            print()
+            print("  # Option 2: Use synthetic data")
+            print("  python experiments/bayesian_uncertainty_modeling.py --synthetic")
+            sys.exit(1)
+        
+        # Run experiment
+        run_experiment(data_dir)
     
     # Hierarchical model (optional)
     if "--hierarchical" in sys.argv and PYMC_AVAILABLE:
