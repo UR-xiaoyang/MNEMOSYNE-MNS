@@ -1,0 +1,66 @@
+{
+  "model_version": "v3.0",
+  "model_name": "MNEMOSYNE-MNS-RANK-V3-FINAL",
+  "description": "Production-ready ranking model with Bayesian uncertainty features",
+  "train_date": "2026-11-08",
+  "performance": {
+    "holdout_auc": 0.9997,
+    "holdout_accuracy": 0.9944,
+    "holdout_f1": 0.9968,
+    "holdout_minority_f1": 0.9783,
+    "val_auc": 0.9995,
+    "val_accuracy": 0.9934,
+    "val_f1": 0.9962,
+    "val_minority_f1": 0.9747
+  },
+  "baseline_comparison": {
+    "auc_gain": 0.0030,
+    "accuracy_gain": 0.0102,
+    "minority_f1_gain": 0.0404
+  },
+  "features": {
+    "total": 19,
+    "active": 18,
+    "efficiency": 0.95,
+    "feature_names": [
+      "query_len",
+      "memory_len",
+      "len_ratio",
+      "lexical_overlap",
+      "lexical_jaccard",
+      "lexical_containment",
+      "query_negation",
+      "memory_negation",
+      "e5_cosine",
+      "e5_euclidean",
+      "e5_manhattan",
+      "query_specificity",
+      "memory_informativeness",
+      "bayes_mean",
+      "bayes_std",
+      "bayes_ci_width",
+      "bayes_coverage",
+      "bayes_consistency",
+      "bayes_confidence"
+    ]
+  },
+  "bayesian_features": {
+    "count": 6,
+    "total_importance": 0.028,
+    "contribution": "Significant for minority class (+4% F1)",
+    "key_feature": "bayes_std (Rank 11, 2.8% importance)"
+  },
+  "training": {
+    "train_samples": 24829,
+    "val_samples": 5321,
+    "holdout_samples": 5321,
+    "bayesian_stats_count": 4169,
+    "bayesian_coverage": 0.77
+  },
+  "deployment": {
+    "status": "production_ready",
+    "score": 9.3,
+    "recommendation": "Deploy with shadow mode → A/B test → gradual rollout",
+    "risk_level": "low"
+  }
+}

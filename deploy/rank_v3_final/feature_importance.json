@@ -1,0 +1,21 @@
+{
+  "query_len": 785,
+  "memory_len": 1013,
+  "len_ratio": 496,
+  "lexical_overlap": 126,
+  "lexical_jaccard": 476,
+  "lexical_containment": 409,
+  "query_negation": 85,
+  "memory_negation": 131,
+  "e5_cosine": 611,
+  "e5_euclidean": 397,
+  "e5_manhattan": 363,
+  "query_specificity": 245,
+  "memory_informativeness": 691,
+  "bayes_mean": 0,
+  "bayes_std": 142,
+  "bayes_ci_width": 18,
+  "bayes_coverage": 9,
+  "bayes_consistency": 3,
+  "bayes_confidence": 0
+}

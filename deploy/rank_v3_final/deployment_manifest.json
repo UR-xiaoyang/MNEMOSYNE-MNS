@@ -1,0 +1,47 @@
+{
+  "deployment_manifest_version": "1.0",
+  "model_id": "rank_v3_final",
+  "deployment_date": "2026-11-08",
+  "deployment_status": "production_ready",
+  "files": {
+    "model": "model.txt",
+    "metadata": "metadata.json",
+    "feature_importance": "feature_importance.json",
+    "deployment_doc": "DEPLOYMENT.md"
+  },
+  "checksums": {
+    "model.txt": "sha256_placeholder",
+    "metadata.json": "sha256_placeholder"
+  },
+  "deployment_phases": [
+    {
+      "phase": "shadow",
+      "duration_weeks": 2,
+      "traffic_percent": 0,
+      "monitoring": ["prediction_diff", "latency", "memory_usage"]
+    },
+    {
+      "phase": "ab_test",
+      "duration_weeks": 2,
+      "traffic_percent": 10,
+      "success_criteria": ["minority_f1_gain >= 2%", "latency_increase < 10%"]
+    },
+    {
+      "phase": "gradual_rollout",
+      "duration_weeks": 4,
+      "traffic_percent": [20, 50, 100],
+      "monitoring": ["user_satisfaction", "citation_rate", "system_health"]
+    }
+  ],
+  "rollback_triggers": {
+    "latency_p95_ms": 100,
+    "error_rate_percent": 1.0,
+    "memory_usage_mb": 500,
+    "minority_f1_drop_percent": 2.0
+  },
+  "integration": {
+    "env_var": "MNEMOSYNE_RANKER_VERSION=v3",
+    "factory_method": "create_pipeline('v3')",
+    "fallback_version": "v2"
+  }
+}
