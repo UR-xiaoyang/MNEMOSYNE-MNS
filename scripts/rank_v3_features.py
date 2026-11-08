@@ -8,17 +8,25 @@ V3 uses 19 features:
 - 2 enhanced features
 - 6 Bayesian uncertainty features
 
-For production inference without real Bayesian statistics,
-Bayesian features default to prior values (zeros).
+Bayesian features are loaded from memory.db if available,
+otherwise default to prior values (zeros).
 """
 import numpy as np
 import re
+from typing import List, Optional
+
+try:
+    from bayesian_stats_loader import get_bayesian_stats_loader
+    BAYESIAN_LOADER_AVAILABLE = True
+except ImportError:
+    BAYESIAN_LOADER_AVAILABLE = False
 
 
 def extract_v3_features(
     queries: list[str],
     memories: list[str], 
-    e5_cosine: np.ndarray
+    e5_cosine: np.ndarray,
+    memory_ids: Optional[List[str]] = None
 ) -> np.ndarray:
     """
     Extract 19-dimensional features for RANK V3.
@@ -27,12 +35,26 @@ def extract_v3_features(
         queries: List of query strings
         memories: List of memory strings
         e5_cosine: [N, 1] E5 cosine similarity
+        memory_ids: Optional list of memory IDs for loading Bayesian stats
         
     Returns:
         [N, 19] feature matrix
     """
     n = len(queries)
     features = np.zeros((n, 19), dtype=np.float32)
+    
+    # 加载贝叶斯统计（如果可用且提供了memory_ids）
+    bayesian_stats_map = {}
+    if BAYESIAN_LOADER_AVAILABLE and memory_ids is not None:
+        try:
+            loader = get_bayesian_stats_loader()  # type: ignore
+            bayesian_stats_map = {
+                mid: loader.get_stats(mid) 
+                for mid in memory_ids
+            }
+        except Exception:
+            # 加载失败，使用零值
+            pass
     
     for i in range(n):
         query = queries[i]
@@ -88,25 +110,24 @@ def extract_v3_features(
         avg_token_len_mem = np.mean([len(t) for t in memory_tokens]) if memory_tokens else 0
         features[i, 12] = avg_token_len_mem
         
-        # Bayesian features (13-18): default to zeros without real statistics
-        # In production with shadow mode, these would be populated from memory.db
-        # 13: bayes_mean
-        features[i, 13] = 0.0
-        
-        # 14: bayes_std  
-        features[i, 14] = 0.0
-        
-        # 15: bayes_ci_width
-        features[i, 15] = 0.0
-        
-        # 16: bayes_coverage (has data flag)
-        features[i, 16] = 0.0
-        
-        # 17: bayes_consistency
-        features[i, 17] = 0.0
-        
-        # 18: bayes_confidence
-        features[i, 18] = 0.0
+        # Bayesian features (13-18): load from database if available
+        memory_id = memory_ids[i] if memory_ids and i < len(memory_ids) else None
+        if memory_id and memory_id in bayesian_stats_map:
+            stats = bayesian_stats_map[memory_id]
+            features[i, 13] = stats['bayes_mean']
+            features[i, 14] = stats['bayes_std']
+            features[i, 15] = stats['bayes_ci_width']
+            features[i, 16] = stats['bayes_coverage']
+            features[i, 17] = stats['bayes_consistency']
+            features[i, 18] = stats['bayes_confidence']
+        else:
+            # 无统计数据，使用零值（先验）
+            features[i, 13] = 0.0  # bayes_mean
+            features[i, 14] = 0.0  # bayes_std  
+            features[i, 15] = 0.0  # bayes_ci_width
+            features[i, 16] = 0.0  # bayes_coverage
+            features[i, 17] = 0.0  # bayes_consistency
+            features[i, 18] = 0.0  # bayes_confidence
     
     return features
 
