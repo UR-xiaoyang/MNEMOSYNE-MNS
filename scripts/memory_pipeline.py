@@ -259,7 +259,7 @@ def create_pipeline(model_name: str = "hybrid") -> MemoryPipeline:
     Factory function to create pipeline with different models.
     
     Args:
-        model_name: "hybrid" | "v2" | "extended" | "e5" | "tree"
+        model_name: "hybrid" | "v2" | "v3" | "extended" | "e5" | "tree"
     
     Returns:
         Configured MemoryPipeline
@@ -267,6 +267,7 @@ def create_pipeline(model_name: str = "hybrid") -> MemoryPipeline:
     model_paths = {
         "hybrid": "deploy/model_bundle" if (PROJECT_ROOT / "deploy/model_bundle").is_dir() else "runs/rank_hybrid_v1",
         "v2": "deploy/rank_enhanced_v2" if (PROJECT_ROOT / "deploy/rank_enhanced_v2").is_dir() else "runs/rank_enhanced_v2",
+        "v3": "deploy/rank_v3_final" if (PROJECT_ROOT / "deploy/rank_v3_final").is_dir() else "runs/rank_v3_final",
         "extended": "runs/rank_extended_v1",
         "e5": "runs/rank_embedding_e5_v1",
         "tree": "runs/rank_pairwise_tree_v1",

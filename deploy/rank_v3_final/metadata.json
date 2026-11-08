@@ -1,7 +1,9 @@
 {
+  "model_id": "MNEMOSYNE-MNS-RANK-V3-FINAL",
   "model_version": "v3.0",
   "model_name": "MNEMOSYNE-MNS-RANK-V3-FINAL",
   "description": "Production-ready ranking model with Bayesian uncertainty features",
+  "encoder": "intfloat/multilingual-e5-small",
   "train_date": "2026-11-08",
   "performance": {
     "holdout_auc": 0.9997,

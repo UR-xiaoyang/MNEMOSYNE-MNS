@@ -106,6 +106,20 @@ class RankingBaseline:
             self.encoder = self.auto_model.from_pretrained(self.encoder_name, local_files_only=offline).to(self.device)
             self.encoder.eval()
             
+        elif self.model_id == "MNEMOSYNE-MNS-RANK-V3-FINAL":
+            # V3 with Bayesian uncertainty features
+            import lightgbm as lgb
+            model_txt_path = self.model_path / "model.txt"
+            if not model_txt_path.exists():
+                raise FileNotFoundError(f"V3 model not found: {model_txt_path}")
+            self.ranker = lgb.Booster(model_file=str(model_txt_path))
+            self.encoder_name = self.metadata.get("encoder", "intfloat/multilingual-e5-small")
+            self.encoder_name = os.environ.get("MNEMOSYNE_E5_MODEL", self.encoder_name)
+            offline = os.environ.get("HF_HUB_OFFLINE") == "1"
+            self.tokenizer = self.auto_tokenizer.from_pretrained(self.encoder_name, local_files_only=offline)
+            self.encoder = self.auto_model.from_pretrained(self.encoder_name, local_files_only=offline).to(self.device)
+            self.encoder.eval()
+            
         else:
             raise ValueError(f"Unknown model_id: {self.model_id}")
     
@@ -175,6 +189,26 @@ class RankingBaseline:
             
             # Extract 23-dimensional features
             features = extract_enhanced_features(queries, memories, e5_cosine)
+            
+            # LightGBM inference
+            return self.ranker.predict(features)
+        
+        elif self.model_id == "MNEMOSYNE-MNS-RANK-V3-FINAL":
+            # Import V3 feature extractor
+            try:
+                from rank_v3_features import extract_v3_features
+            except ModuleNotFoundError:
+                from .rank_v3_features import extract_v3_features
+            
+            # Encode with E5
+            query_emb = self.encode_text(queries, "query: ")
+            memory_emb = self.encode_text(memories, "passage: ")
+            e5_cosine = np.sum(query_emb * memory_emb, axis=1, keepdims=True)
+            
+            # Extract 19-dimensional features for V3
+            # Note: Bayesian features default to zeros without real statistics
+            # In production with shadow mode, these can be populated from memory.db
+            features = extract_v3_features(queries, memories, e5_cosine)
             
             # LightGBM inference
             return self.ranker.predict(features)

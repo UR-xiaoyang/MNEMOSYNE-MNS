@@ -58,8 +58,8 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 
-# Initialize pipeline - Use V2 by default, fallback to hybrid
-ranker_version = os.environ.get("MNEMOSYNE_RANKER_VERSION", "v2")
+# Initialize pipeline - Use V3 by default, fallback to hybrid
+ranker_version = os.environ.get("MNEMOSYNE_RANKER_VERSION", "v3")
 print(f"Loading RANK model (version: {ranker_version})...")
 try:
     pipeline = create_pipeline(ranker_version)
