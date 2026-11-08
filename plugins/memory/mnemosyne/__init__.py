@@ -224,6 +224,51 @@ class MnemosyneMemoryProvider(MemoryProvider):
         # Unknown mode: safe fallback to session
         return "session"
 
+    def _should_auto_recall(self) -> bool:
+        """检查是否启用自动检索."""
+        return os.environ.get("MNEMOSYNE_AUTO_RECALL", "0") == "1"
+
+    def _should_auto_store(self) -> bool:
+        """检查是否启用自动存储."""
+        return os.environ.get("MNEMOSYNE_AUTO_STORE", "0") == "1"
+
+    def _extract_key_info(self, user_text: str, assistant_text: str) -> str | None:
+        """从对话中提取关键信息用于存储."""
+        store_triggers = ["请记住", "记录", "保存", "记下", "项目", "进度", "状态", "完成", "配置", "设置", "部署"]
+        for trigger in store_triggers:
+            if trigger in user_text:
+                if len(assistant_text) < 500:
+                    return assistant_text
+                else:
+                    return f"{user_text[:100]}... → {assistant_text[:300]}..."
+        if any(word in user_text for word in ["进度", "状态", "怎么样"]):
+            if any(word in assistant_text for word in ["完成", "已", "✅", "成功"]):
+                return f"状态更新: {user_text[:50]} → {assistant_text[:200]}"
+        return None
+
+
+    def _should_auto_recall(self) -> bool:
+        """检查是否启用自动检索."""
+        return os.environ.get("MNEMOSYNE_AUTO_RECALL", "0") == "1"
+    
+    def _should_auto_store(self) -> bool:
+        """检查是否启用自动存储."""
+        return os.environ.get("MNEMOSYNE_AUTO_STORE", "0") == "1"
+    
+    def _extract_key_info(self, user_text: str, assistant_text: str) -> str | None:
+        """从对话中提取关键信息用于存储."""
+        store_triggers = ["请记住", "记录", "保存", "记下", "项目", "进度", "状态", "完成"]
+        for trigger in store_triggers:
+            if trigger in user_text:
+                if len(assistant_text) < 500:
+                    return assistant_text
+                else:
+                    return f"{user_text[:100]}... → {assistant_text[:300]}..."
+        if any(word in user_text for word in ["进度", "状态", "怎么样"]):
+            if any(word in assistant_text for word in ["完成", "已", "✅", "成功"]):
+                return f"状态更新: {user_text[:50]} → {assistant_text[:200]}"
+        return None
+
     def initialize(self, session_id: str, **kwargs) -> None:
         self._session_id = session_id
         self._turn_id = "turn-0"
@@ -416,6 +461,15 @@ class MnemosyneMemoryProvider(MemoryProvider):
                 )
         except Exception:
             return None
+        
+        # Auto-store if enabled
+        if self._should_auto_store() and self._memory_mode == "experimental_global":
+            try:
+                key_info = self._extract_key_info(user_content, assistant_content)
+                if key_info:
+                    self._client.write_proposals(key_info, scope_level="session")
+            except Exception:
+                pass
 
     def on_session_switch(
         self,
